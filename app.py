@@ -53,7 +53,7 @@ def gerar_pdf(df):
     pdf.set_font("Helvetica", "B", 16)
     
     # Título do PDF
-    pdf.cell(0, 10, "Relatorio de Frequencia e Presenca", ln=True, align="C")
+    pdf.cell(0, 10, "RELATORIO DE FREQUENCIA E PRESENCA", ln=True, align="C")
     pdf.ln(10)
     
     # Cabeçalho da Tabela
@@ -62,7 +62,8 @@ def gerar_pdf(df):
     colunas = list(df.columns)
     
     for i, col in enumerate(colunas):
-        pdf.cell(col_larguras[i], 8, col, border=1, align="C")
+        # Converte cabeçalhos para maiúsculo no PDF
+        pdf.cell(col_larguras[i], 8, col.upper(), border=1, align="C")
     pdf.ln()
     
     # Dados da Tabela
@@ -103,7 +104,7 @@ def tela_login():
 # --- TELA PRINCIPAL (SISTEMA) ---
 def tela_sistema():
     st.title("📋 Sistema de Registro de Presença")
-    st.write(f"Conectado como: **{st.session_state['usuario_atual']}**")
+    st.write(f"Conectado como: **{st.session_state['usuario_atual'].upper()}**")
     
     if st.button("Sair / Logout"):
         st.session_state['logado'] = False
@@ -119,7 +120,7 @@ def tela_sistema():
         "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"
     ]
     
-    # --- CORREÇÃO AUTOMÁTICA DE FUSO HORÁRIO (BRASÍLIA / BELÉM) ---
+    # Fuso horário base para sugerir o horário atual no relógio inicial
     fuso_horario = dt.timezone(dt.timedelta(hours=-3))
     agora_local = datetime.now(fuso_horario)
     
@@ -127,26 +128,34 @@ def tela_sistema():
         col1, col2 = st.columns(2)
         
         with col1:
-            encarregado = st.text_input("Encarregado", value=st.session_state['usuario_atual'])
+            encarregado_input = st.text_input("Encarregado", value=st.session_state['usuario_atual'])
             localidade = st.selectbox("Localidade", options=lista_localidades)
-            balsa = st.text_input("Balsa")
+            balsa_input = st.text_input("Balsa")
             
         with col2:
-            nome_esc = st.text_input("Nome do Esc.")
+            nome_esc_input = st.text_input("Nome do Esc.")
             data_atual = st.date_input("Data", agora_local.date(), format="DD/MM/YYYY")
+            # O usuário escolhe livremente a hora aqui
             hora_atual = st.time_input("Hora", agora_local.time())
             
-        observacao = st.text_area("Observação")
+        observacao_input = st.text_area("Observação")
             
         botao_enviar = st.form_submit_button("Registrar Presença")
         
         if botao_enviar:
-            if balsa and nome_esc:
-                data_str = data_atual.strftime("%d/%m/%Y")
+            if balsa_input and nome_esc_input:
+                # AJUSTE 1: Pega exatamente a hora que o usuário definiu no formulário
                 hora_str = hora_atual.strftime("%H:%M")
+                data_str = data_atual.strftime("%d/%m/%Y")
+                
+                # AJUSTE 2: Transforma todos os textos digitados em LETRAS MAIÚSCULAS (.upper())
+                encarregado = encarregado_input.strip().upper()
+                balsa = balsa_input.strip().upper()
+                nome_esc = nome_esc_input.strip().upper()
+                observacao = observacao_input.strip().upper()
                 
                 salvar_registro(encarregado, localidade, balsa, nome_esc, data_str, hora_str, observacao)
-                st.success("✅ Registro salvo com sucesso!")
+                st.success("✅ REGISTRO SALVO COM SUCESSO!")
                 st.rerun()
             else:
                 st.error("⚠️ Por favor, preencha os campos obrigatórios (Balsa e Nome do Esc.).")
@@ -156,7 +165,6 @@ def tela_sistema():
     # Visualização da Tabela de Registros
     st.subheader("📊 Histórico de Frequência")
     
-    # Botão de Reset para o Administrador limpar os dados com horários antigos desalinhados
     if st.session_state['usuario_atual'] == 'admin':
         if st.button("⚠️ Limpar Histórico Antigo (Apagar Tabela/Reset)"):
             conn = sqlite3.connect('registro_presenca.db')
