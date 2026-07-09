@@ -29,18 +29,18 @@ def salvar_registro(encarregado, localidade, balsa, nome_esc, data, hora, observ
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
     c.execute('''
-        INSERT INTO frequencia (encarregado, localidade, balsa, nome_esc, data, hora, observacao)
+        INSERT INTO frequencia (encarregado, localidade, balsa, nome_escoltas, data, hora, observacao)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (encarregado, localidade, balsa, nome_esc, data, hora, observacao))
+    ''', (encarregado, localidade, balsa, nome_escoltas, data, hora, observacao))
     conn.commit()
     conn.close()
 
 def buscar_registros_df():
     conn = sqlite3.connect('registro_presenca.db')
-    query = "SELECT encarregado, localidade, balsa, nome_esc, data, hora, observacao FROM frequencia"
+    query = "SELECT encarregado, localidade, balsa, nome_escoltas, data, hora, observacao FROM frequencia"
     df = pd.read_sql_query(query, conn)
     conn.close()
-    df.columns = ["Encarregado", "Localidade", "Balsa", "Nome do Esc.", "Data", "Hora", "Observação"]
+    df.columns = ["Encarregado", "Localidade", "Balsa", "Nome do Escoltas.", "Data", "Hora", "Observação"]
     return df
 
 # Inicializa o banco de dados
