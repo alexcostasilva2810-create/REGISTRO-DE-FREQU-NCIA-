@@ -97,13 +97,13 @@ def tela_sistema():
         
         with col1:
             encarregado = st.text_input("Encarregado", value=st.session_state['usuario_atual'])
-            # Dropdown de Localidade adicionado aqui
             localidade = st.selectbox("Localidade", options=lista_localidades)
             balsa = st.text_input("Balsa")
             
         with col2:
             nome_esc = st.text_input("Nome do Esc.")
-            data_atual = st.date_input("Data", datetime.now().date())
+            # ADICIONADO: format="DD/MM/YYYY" para exibir no padrão brasileiro
+            data_atual = st.date_input("Data", datetime.now().date(), format="DD/MM/YYYY")
             hora_atual = st.time_input("Hora", datetime.now().time())
             
         observacao = st.text_area("Observação")
@@ -112,30 +112,3 @@ def tela_sistema():
         
         if botao_enviar:
             if balsa and nome_esc: # Validação simples para campos obrigatórios
-                # Converte data e hora para string para salvar no banco
-                data_str = data_atual.strftime("%d/%m/%Y")
-                hora_str = hora_atual.strftime("%H:%M:%S")
-                
-                salvar_registro(encarregado, localidade, balsa, nome_esc, data_str, hora_str, observacao)
-                st.success("✅ Registro salvo com sucesso!")
-            else:
-                st.error("⚠️ Por favor, preencha os campos obrigatórios (Balsa e Nome do Esc.).")
-
-    st.markdown("---")
-    
-    # Visualização da Tabela de Registros
-    st.subheader("📊 Histórico de Frequência")
-    registros = buscar_registros()
-    
-    if registros:
-        # Exibe os dados atualizados incluindo a Localidade
-        colunas = ["Encarregado", "Localidade", "Balsa", "Nome do Esc.", "Data", "Hora", "Observação"]
-        st.dataframe(registros, column_config={i: col for i, col in enumerate(colunas)}, use_container_width=True)
-    else:
-        st.info("Nenhum registro encontrado até o momento.")
-
-# --- FLUXO DA APLICAÇÃO ---
-if not st.session_state['logado']:
-    tela_login()
-else:
-    tela_sistema()
