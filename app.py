@@ -5,6 +5,43 @@ from datetime import datetime
 import datetime as dt
 from fpdf import FPDF
 from io import BytesIO
+import base64  # Necessário para codificar a imagem de fundo
+
+# --- CONFIGURAÇÃO VISUAL (CSS PERSONALIZADO) ---
+def carregar_css_com_fundo(nome_arquivo_imagem):
+    with open(nome_arquivo_imagem, "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read()).decode()
+    
+    css_string = f"""
+    <style>
+    .stApp {{
+        background-image: url("data:image/jpeg;base64,{encoded_string}");
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }}
+
+    /* Ajuste para melhorar a legibilidade do texto sobre o fundo */
+    h1, h2, h3, p, .stMarkdown, div[data-baseweb="select"] {{
+        background-color: rgba(255, 255, 255, 0.85); /* Fundo branco semitransparente atrás do texto */
+        padding: 5px 10px;
+        border-radius: 5px;
+    }}
+    
+    /* Ajustes específicos para inputs e texto do form */
+    .stTextInput>div>div>input, .stForm {{
+        background-color: white !important;
+    }}
+    
+    /* Melhora visual para a tabela */
+    [data-testid="stDataFrame"] {{
+        background-color: rgba(255, 255, 255, 0.9) !important;
+        border-radius: 5px;
+        padding: 5px;
+    }}
+    </style>
+    """
+    st.markdown(css_string, unsafe_allow_html=True)
 
 # --- CONFIGURAÇÃO DO BANCO DE DADOS ---
 def iniciar_bd():
@@ -16,7 +53,7 @@ def iniciar_bd():
             encarregado TEXT,
             localidade TEXT,
             balsa TEXT,
-            nome_escoltas TEXT,
+            nome_escolta TEXT, -- AJUSTE NO NOME DA COLUNA NO BD
             data TEXT,
             hora TEXT,
             observacao TEXT
@@ -25,22 +62,24 @@ def iniciar_bd():
     conn.commit()
     conn.close()
 
-def salvar_registro(encarregado, localidade, balsa, nome_esc, data, hora, observacao):
+def salvar_registro(encarregado, localidade, balsa, nome_escolta, data, hora, observacao):
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
     c.execute('''
-        INSERT INTO frequencia (encarregado, localidade, balsa, nome_escoltas, data, hora, observacao)
+        INSERT INTO frequencia (encarregado, localidade, balsa, nome_escolta, data, hora, observacao)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (encarregado, localidade, balsa, nome_escoltas, data, hora, observacao))
+    ''', (encarregado, localidade, balsa, nome_escolta, data, hora, observacao))
     conn.commit()
     conn.close()
 
 def buscar_registros_df():
     conn = sqlite3.connect('registro_presenca.db')
-    query = "SELECT encarregado, localidade, balsa, nome_escoltas, data, hora, observacao FROM frequencia"
+    query = "SELECT encarregado, localidade, balsa, nome_escolta, data, hora, observacao FROM frequencia"
     df = pd.read_sql_query(query, conn)
     conn.close()
-    df.columns = ["Encarregado", "Localidade", "Balsa", "Nome do Escoltas.", "Data", "Hora", "Observação"]
+    
+    # AJUSTE NO NOME DA COLUNA NA EXIBIÇÃO DA TABELA
+    df.columns = ["Encarregado", "Localidade", "Balsa", "Nome do Escolta", "Data", "Hora", "Observação"]
     return df
 
 # Inicializa o banco de dados
@@ -88,6 +127,12 @@ USUARIOS_VALIDOS = {
 }
 
 def tela_login():
+    # Tenta carregar a imagem de fundo para a tela de login também
+    try:
+        carregar_css_com_fundo("fundo_porto.jpg")
+    except FileNotFoundError:
+        st.warning("Imagem 'fundo_porto.jpg' não encontrada. Usando fundo padrão.")
+
     st.subheader("🔑 Login do Sistema")
     usuario = st.text_input("Usuário")
     senha = st.text_input("Senha", type="password")
@@ -102,6 +147,12 @@ def tela_login():
 
 # --- TELA PRINCIPAL (SISTEMA) ---
 def tela_sistema():
+    # Carrega o CSS com a imagem de fundo
+    try:
+        carregar_css_com_fundo("fundo_porto.jpg")
+    except FileNotFoundError:
+        st.warning("Imagem 'fundo_porto.jpg' não encontrada. Usando fundo padrão.")
+
     st.title("📋 Sistema de Registro de Presença")
     st.write(f"Conectado como: **{st.session_state['usuario_atual'].upper()}**")
     
@@ -119,11 +170,9 @@ def tela_sistema():
         "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"
     ]
     
-    # Define o fuso horário para preencher o valor padrão inicial do relógio
     fuso_horario = dt.timezone(dt.timedelta(hours=-3))
     agora_local = datetime.now(fuso_horario)
     
-    # REMOVIDO o clear_on_submit daqui para evitar que o Streamlit resete os dados antes da leitura
     with st.form(key='form_registro'):
         col1, col2 = st.columns(2)
         
@@ -133,7 +182,8 @@ def tela_sistema():
             balsa_input = st.text_input("Balsa")
             
         with col2:
-            nome_esc_input = st.text_input("Nome do Esc.")
+            # AJUSTE NO RÓTULO DO CAMPO NO FORMULÁRIO
+            nome_escolta_input = st.text_input("Nome do Escolta")
             data_atual = st.date_input("Data", agora_local.date(), format="DD/MM/YYYY")
             hora_atual = st.time_input("Hora", agora_local.time())
             
@@ -142,22 +192,20 @@ def tela_sistema():
         botao_enviar = st.form_submit_button("Registrar Presença")
         
         if botao_enviar:
-            if balsa_input and nome_esc_input:
-                # CORREÇÃO: Captura os valores exatos inseridos na tela ANTES de qualquer reset
+            if balsa_input and nome_escolta_input:
                 hora_str = hora_atual.strftime("%H:%M")
                 data_str = data_atual.strftime("%d/%m/%Y")
                 
                 encarregado = encarregado_input.strip().upper()
                 balsa = balsa_input.strip().upper()
-                nome_esc = nome_esc_input.strip().upper()
+                nome_escolta = nome_escolta_input.strip().upper()
                 observacao = observacao_input.strip().upper()
                 
-                # Grava no Banco de Dados
-                salvar_registro(encarregado, localidade, balsa, nome_esc, data_str, hora_str, observacao)
+                salvar_registro(encarregado, localidade, balsa, nome_escolta, data_str, hora_str, observacao)
                 st.success("✅ REGISTRO SALVO COM SUCESSO!")
                 st.rerun()
             else:
-                st.error("⚠️ Por favor, preencha os campos obrigatórios (Balsa e Nome do Esc.).")
+                st.error("⚠️ Por favor, preencha os campos obrigatórios (Balsa e Nome do Escolta).")
 
     st.markdown("---")
     
