@@ -62,7 +62,6 @@ def gerar_pdf(df):
     colunas = list(df.columns)
     
     for i, col in enumerate(colunas):
-        # Converte cabeçalhos para maiúsculo no PDF
         pdf.cell(col_larguras[i], 8, col.upper(), border=1, align="C")
     pdf.ln()
     
@@ -120,11 +119,12 @@ def tela_sistema():
         "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"
     ]
     
-    # Fuso horário base para sugerir o horário atual no relógio inicial
+    # Define o fuso horário para preencher o valor padrão inicial do relógio
     fuso_horario = dt.timezone(dt.timedelta(hours=-3))
     agora_local = datetime.now(fuso_horario)
     
-    with st.form(key='form_registro', clear_on_submit=True):
+    # REMOVIDO o clear_on_submit daqui para evitar que o Streamlit resete os dados antes da leitura
+    with st.form(key='form_registro'):
         col1, col2 = st.columns(2)
         
         with col1:
@@ -135,7 +135,6 @@ def tela_sistema():
         with col2:
             nome_esc_input = st.text_input("Nome do Esc.")
             data_atual = st.date_input("Data", agora_local.date(), format="DD/MM/YYYY")
-            # O usuário escolhe livremente a hora aqui
             hora_atual = st.time_input("Hora", agora_local.time())
             
         observacao_input = st.text_area("Observação")
@@ -144,16 +143,16 @@ def tela_sistema():
         
         if botao_enviar:
             if balsa_input and nome_esc_input:
-                # AJUSTE 1: Pega exatamente a hora que o usuário definiu no formulário
+                # CORREÇÃO: Captura os valores exatos inseridos na tela ANTES de qualquer reset
                 hora_str = hora_atual.strftime("%H:%M")
                 data_str = data_atual.strftime("%d/%m/%Y")
                 
-                # AJUSTE 2: Transforma todos os textos digitados em LETRAS MAIÚSCULAS (.upper())
                 encarregado = encarregado_input.strip().upper()
                 balsa = balsa_input.strip().upper()
                 nome_esc = nome_esc_input.strip().upper()
                 observacao = observacao_input.strip().upper()
                 
+                # Grava no Banco de Dados
                 salvar_registro(encarregado, localidade, balsa, nome_esc, data_str, hora_str, observacao)
                 st.success("✅ REGISTRO SALVO COM SUCESSO!")
                 st.rerun()
