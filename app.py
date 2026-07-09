@@ -143,7 +143,6 @@ def gerar_pdf(df):
 if 'logado' not in st.session_state:
     st.session_state['logado'] = False
 
-# LISTA CONFIGURADA COM EXATAMENTE 7 USUÁRIOS OPERACIONAIS (Altere as senhas como desejar)
 USUARIOS_VALIDOS = {
     "admin": "1234",
     "supervisor": "senha123",
@@ -191,11 +190,12 @@ def tela_sistema():
     # Layout em colunas: [Escolta Esquerda] [Painel Central] [Escolta Direita]
     col_lateral_esq, col_central_painel, col_lateral_dir = st.columns([1, 4, 1])
     
+    # EXCLUSÃO EFETUADA: Removido o parâmetro 'caption' das imagens laterais
     with col_lateral_esq:
-        st.image(url_escolta_esquerda, caption="Segurança VIP", use_container_width=True)
+        st.image(url_escolta_esquerda, use_container_width=True)
         
     with col_lateral_dir:
-        st.image(url_escolta_direita, caption="Pronto Emprego", use_container_width=True)
+        st.image(url_escolta_direita, use_container_width=True)
         
     with col_central_painel:
         lista_localidades = ["MIRITITUBA", "SANTARÉM", "BELÉM", "MANAUS", "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"]
