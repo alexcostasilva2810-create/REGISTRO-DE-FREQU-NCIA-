@@ -6,9 +6,8 @@ import datetime as dt
 from fpdf import FPDF
 from io import BytesIO
 
-# --- CONFIGURAÇÃO VISUAL (CSS COM IMAGEM DE FUNDO TÁTICA/SEGURANÇA) ---
+# --- CONFIGURAÇÃO VISUAL (CSS COM IMAGEM DE MONITORAMENTO OPERACIONAL) ---
 def carregar_css_com_fundo():
-    # Imagem de fundo sutil de monitoramento/segurança operacional para o fundo geral
     url_fundo = "https://images.unsplash.com/photo-1557597774-9d273605dfa9?q=80&w=1200&auto=format&fit=crop"
     
     css_string = f"""
@@ -21,14 +20,13 @@ def carregar_css_com_fundo():
         background-position: center;
     }}
 
-    /* Estilização dos blocos para contraste e visual tático profissional */
+    /* Estilização dos blocos para contraste e leitura tática */
     h1, h2, h3, p, .stMarkdown, div[data-baseweb="select"], .stAlert {{
         background-color: rgba(255, 255, 255, 0.95);
         padding: 10px 15px;
         border-radius: 6px;
         color: #0F172A !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.15);
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     }}
     
     /* Inputs visíveis */
@@ -37,7 +35,7 @@ def carregar_css_com_fundo():
         border: 1px solid #1E293B !important;
     }}
     
-    /* Estilização da tabela de dados */
+    /* Estilização da tabela */
     [data-testid="stDataFrame"] {{
         background-color: rgba(255, 255, 255, 0.96) !important;
         border-radius: 6px;
@@ -48,8 +46,9 @@ def carregar_css_com_fundo():
     """
     st.markdown(css_string, unsafe_allow_html=True)
 
-# --- CONFIGURAÇÃO E CORREÇÃO AUTOMÁTICA DO BANCO DE DADOS ---
-def iniciar_e_atualizar_bd():
+# --- CONFIGURAÇÃO INTELIGENTE DO BANCO DE DADOS ---
+def obter_coluna_segura():
+    """Descobre dinamicamente se o BD usa 'nome_esc' ou 'nome_escolta' para evitar erros ao salvar"""
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
     c.execute('''
@@ -64,46 +63,42 @@ def iniciar_e_atualizar_bd():
             observacao TEXT
         )
     ''')
-    
-    # Validação estrutural de colunas
     c.execute("PRAGMA table_info(frequencia)")
     colunas = [col[1] for col in c.fetchall()]
-    if "nome_esc" in colunas and "nome_escolta" not in colunas:
-        try:
-            c.execute("ALTER TABLE frequencia RENAME COLUMN nome_esc TO nome_escolta")
-        except Exception:
-            pass
-            
-    conn.commit()
     conn.close()
+    
+    if "nome_esc" in colunas:
+        return "nome_esc"
+    return "nome_escolta"
 
-def salvar_registro(encarregado, localidade, balsa, nome_escolta, data, hora, observacao):
+def salvar_registro(encarregado, localidade, balsa, valor_escolta, data, hora, observacao):
+    coluna_ativa = obter_coluna_segura()
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
-    c.execute('''
-        INSERT INTO frequencia (encarregado, localidade, balsa, nome_escolta, data, hora, observacao)
+    
+    # Executa o INSERT usando dinamicamente a coluna que o banco possui no momento
+    query = f'''
+        INSERT INTO frequencia (encarregado, localidade, balsa, {coluna_ativa}, data, hora, observacao)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (encarregado, localidade, balsa, nome_escolta, data, hora, observacao))
+    '''
+    c.execute(query, (encarregado, localidade, balsa, valor_escolta, data, hora, observacao))
     conn.commit()
     conn.close()
 
 def buscar_registros_df():
     conn = sqlite3.connect('registro_presenca.db')
-    try:
-        query = "SELECT encarregado, localidade, balsa, nome_escolta, data, hora, observacao FROM frequencia"
-        df = pd.read_sql_query(query, conn)
-    except Exception:
-        query = "SELECT * FROM frequencia"
-        df = pd.read_sql_query(query, conn)
-        if 'id' in df.columns:
-            df = df.drop(columns=['id'])
-    finally:
-        conn.close()
+    c = conn.cursor()
+    c.execute("PRAGMA table_info(frequencia)")
+    colunas = [col[1] for col in c.fetchall()]
+    
+    coluna_busca = "nome_esc" if "nome_esc" in colunas else "nome_escolta"
+    query = f"SELECT encarregado, localidade, balsa, {coluna_busca}, data, hora, observacao FROM frequencia"
+    
+    df = pd.read_sql_query(query, conn)
+    conn.close()
     
     df.columns = ["Encarregado", "Localidade", "Balsa", "Nome do Escolta", "Data", "Hora", "Observação"]
     return df
-
-iniciar_e_atualizar_bd()
 
 # --- FUNÇÃO PARA GERAR PDF ---
 def gerar_pdf(df):
@@ -167,25 +162,21 @@ def tela_sistema():
         st.rerun()
         
     st.markdown("---")
-    
     st.subheader("✍️ Nova Conferência de Frequência")
     
-    # Links de imagens verticais de segurança armada / vigilância operacional para as laterais
-    url_escolta_esquerda = "https://images.unsplash.com/photo-1595152772835-219674b2a8a6?q=80&w=300&auto=format&fit=crop" # Agente tático retrato
-    url_escolta_direita = "https://images.unsplash.com/photo-1628157582853-a796fa650a6a?q=80&w=300&auto=format&fit=crop" # Agente operacional tático
+    # Imagens verticais reais de agentes de segurança armada tática para as laterais do formulário
+    url_escolta_esquerda = "https://images.unsplash.com/photo-1579202673506-ca3ce28943ef?q=80&w=300&auto=format&fit=crop"
+    url_escolta_direita = "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?q=80&w=300&auto=format&fit=crop"
     
-    # --- ESQUEMA DE TRÊS COLUNAS: Escolta Esquerda | Painel Central | Escolta Direita ---
+    # --- PROPORÇÃO DAS COLUNAS: 1 (Esquerda) | 4 (Formulário Central) | 1 (Direita) ---
     col_lateral_esq, col_central_painel, col_lateral_dir = st.columns([1, 4, 1])
     
-    # LADO ESQUERDO: Imagem do Escolta
     with col_lateral_esq:
-        st.image(url_escolta_esquerda, caption="Segurança Ativa", use_container_width=True)
+        st.image(url_escolta_esquerda, caption="Segurança VIP", use_container_width=True)
         
-    # LADO DIREITO: Imagem do Escolta
     with col_lateral_dir:
         st.image(url_escolta_direita, caption="Pronto Emprego", use_container_width=True)
         
-    # PAINEL CENTRAL: Formulário principal de Registro
     with col_central_painel:
         lista_localidades = ["MIRITITUBA", "SANTARÉM", "BELÉM", "MANAUS", "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"]
         fuso_horario = dt.timezone(dt.timedelta(hours=-3))
@@ -231,29 +222,30 @@ def tela_sistema():
             c.execute("DROP TABLE IF EXISTS frequencia")
             conn.commit()
             conn.close()
-            iniciar_e_atualizar_bd()
-            st.success("Banco de dados reiniciado operacionalmente!")
+            st.success("Banco de dados reiniciado e 100% atualizado!")
             st.rerun()
             
-    df_registros = buscar_registros_df()
-    
-    if not df_registros.empty:
-        st.dataframe(df_registros, use_container_width=True)
-        
-        if st.session_state['usuario_atual'] == 'admin':
-            st.markdown("### 🛠️ Painel do Administrador")
-            try:
-                pdf_bytes = gerar_pdf(df_registros)
-                st.download_button(
-                    label="📥 Exportar Histórico para PDF",
-                    data=pdf_bytes,
-                    file_name=f"historico_frequencia_{datetime.now().strftime('%d_%m_%Y')}.pdf",
-                    mime="application/pdf"
-                )
-            except Exception as e:
-                st.error(f"Erro ao processar PDF: {e}")
-    else:
-        st.info("Nenhum registro de escolta ativo encontrado no momento.")
+    try:
+        df_registros = buscar_registros_df()
+        if not df_registros.empty:
+            st.dataframe(df_registros, use_container_width=True)
+            
+            if st.session_state['usuario_atual'] == 'admin':
+                st.markdown("### 🛠️ Painel do Administrador")
+                try:
+                    pdf_bytes = gerar_pdf(df_registros)
+                    st.download_button(
+                        label="📥 Exportar Histórico para PDF",
+                        data=pdf_bytes,
+                        file_name=f"historico_frequencia_{datetime.now().strftime('%d_%m_%Y')}.pdf",
+                        mime="application/pdf"
+                    )
+                except Exception as e:
+                    st.error(f"Erro ao processar PDF: {e}")
+        else:
+            st.info("Nenhum registro de escolta ativo encontrado no momento.")
+    except Exception as e:
+        st.error(f"Erro ao carregar os dados salvos: {e}")
 
 # --- FLUXO PRINCIPAL ---
 if not st.session_state['logado']:
