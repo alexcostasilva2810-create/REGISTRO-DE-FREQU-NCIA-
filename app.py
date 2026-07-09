@@ -6,49 +6,43 @@ import datetime as dt
 from fpdf import FPDF
 from io import BytesIO
 
-# --- CONFIGURAÇÃO VISUAL (CSS COM IMAGEM DE PESSOAS EM OPERAÇÃO PORTUÁRIA) ---
+# --- CONFIGURAÇÃO VISUAL (CSS COM IMAGEM DE FUNDO TÁTICA/SEGURANÇA) ---
 def carregar_css_com_fundo():
-    # Imagem focada em trabalhadores/equipe em operação portuária logística
-    url_imagem = "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=1200&auto=format&fit=crop"
+    # Imagem de fundo sutil de monitoramento/segurança operacional para o fundo geral
+    url_fundo = "https://images.unsplash.com/photo-1557597774-9d273605dfa9?q=80&w=1200&auto=format&fit=crop"
     
     css_string = f"""
     <style>
     .stApp {{
-        background-image: url("{url_imagem}");
+        background-image: url("{url_fundo}");
         background-size: cover;
         background-repeat: no-repeat;
         background-attachment: fixed;
         background-position: center;
     }}
 
-    /* Container semitransparente reforçado para garantir leitura absoluta das mensagens de erro ou texto */
+    /* Estilização dos blocos para contraste e visual tático profissional */
     h1, h2, h3, p, .stMarkdown, div[data-baseweb="select"], .stAlert {{
-        background-color: rgba(255, 255, 255, 0.94);
-        padding: 8px 14px;
+        background-color: rgba(255, 255, 255, 0.95);
+        padding: 10px 15px;
         border-radius: 6px;
         color: #0F172A !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }}
-    
-    /* Cobertura para blocos de exceção/tracebacks do Streamlit ficarem legíveis */
-    .stException {{
-        background-color: rgba(255, 233, 233, 0.96) !important;
-        border: 1px solid #EF4444 !important;
-        border-radius: 6px;
-        padding: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     }}
     
     /* Inputs visíveis */
     .stTextInput>div>div>input, .stForm {{
         background-color: white !important;
+        border: 1px solid #1E293B !important;
     }}
     
-    /* Estilização da tabela */
+    /* Estilização da tabela de dados */
     [data-testid="stDataFrame"] {{
         background-color: rgba(255, 255, 255, 0.96) !important;
         border-radius: 6px;
         padding: 5px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }}
     </style>
     """
@@ -58,8 +52,6 @@ def carregar_css_com_fundo():
 def iniciar_e_atualizar_bd():
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
-    
-    # 1. Cria a tabela se não existir
     c.execute('''
         CREATE TABLE IF NOT EXISTS frequencia (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,10 +65,9 @@ def iniciar_e_atualizar_bd():
         )
     ''')
     
-    # 2. Correção Inteligente: Verifica se a coluna antiga 'nome_esc' ainda existe e migra para 'nome_escolta'
+    # Validação estrutural de colunas
     c.execute("PRAGMA table_info(frequencia)")
     colunas = [col[1] for col in c.fetchall()]
-    
     if "nome_esc" in colunas and "nome_escolta" not in colunas:
         try:
             c.execute("ALTER TABLE frequencia RENAME COLUMN nome_esc TO nome_escolta")
@@ -99,24 +90,19 @@ def salvar_registro(encarregado, localidade, balsa, nome_escolta, data, hora, ob
 def buscar_registros_df():
     conn = sqlite3.connect('registro_presenca.db')
     try:
-        # Tenta a busca padrão estruturada
         query = "SELECT encarregado, localidade, balsa, nome_escolta, data, hora, observacao FROM frequencia"
         df = pd.read_sql_query(query, conn)
     except Exception:
-        # Fallback de segurança absoluto caso ocorra divergência residual
         query = "SELECT * FROM frequencia"
         df = pd.read_sql_query(query, conn)
-        # Remove ID se ele vier na consulta genérica para mapear corretamente
         if 'id' in df.columns:
             df = df.drop(columns=['id'])
-            
-    conn.close()
+    finally:
+        conn.close()
     
-    # Força a nomeação amigável e correta das colunas na interface
     df.columns = ["Encarregado", "Localidade", "Balsa", "Nome do Escolta", "Data", "Hora", "Observação"]
     return df
 
-# Executa o sincronismo automático de tabelas
 iniciar_e_atualizar_bd()
 
 # --- FUNÇÃO PARA GERAR PDF ---
@@ -124,7 +110,6 @@ def gerar_pdf(df):
     pdf = FPDF(orientation="L", unit="mm", format="A4")
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
-    
     pdf.cell(0, 10, "RELATORIO DE FREQUENCIA E PRESENCA", ln=True, align="C")
     pdf.ln(10)
     
@@ -159,70 +144,86 @@ USUARIOS_VALIDOS = {
 
 def tela_login():
     carregar_css_com_fundo()
-    st.subheader("🔑 Login do Sistema")
-    usuario = st.text_input("Usuário")
+    st.subheader("⚡ CONTROLE DE ACESSO - OPERAÇÃO")
+    usuario = st.text_input("Usuário / Credencial")
     senha = st.text_input("Senha", type="password")
     
-    if st.button("Entrar"):
+    if st.button("Autenticar"):
         if usuario in USUARIOS_VALIDOS and USUARIOS_VALIDOS[usuario] == senha:
             st.session_state['logado'] = True
             st.session_state['usuario_atual'] = usuario
             st.rerun()
         else:
-            st.error("Usuário ou senha incorretos.")
+            st.error("Credenciais incorretas ou operador não autorizado.")
 
-# --- TELA PRINCIPAL ---
+# --- TELA PRINCIPAL DO SISTEMA ---
 def tela_sistema():
     carregar_css_com_fundo()
-    st.title("📋 Sistema de Registro de Presença")
-    st.write(f"Conectado como: **{st.session_state['usuario_atual'].upper()}**")
+    st.title("🛡️ Painel de Segurança e Frequência")
+    st.write(f"Operador Ativo: **{st.session_state['usuario_atual'].upper()}**")
     
-    if st.button("Sair / Logout"):
+    if st.button("Finalizar Turno (Logout)"):
         st.session_state['logado'] = False
         st.rerun()
         
     st.markdown("---")
     
     st.subheader("✍️ Nova Conferência de Frequência")
-    lista_localidades = ["MIRITITUBA", "SANTARÉM", "BELÉM", "MANAUS", "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"]
     
-    fuso_horario = dt.timezone(dt.timedelta(hours=-3))
-    agora_local = datetime.now(fuso_horario)
+    # Links de imagens verticais de segurança armada / vigilância operacional para as laterais
+    url_escolta_esquerda = "https://images.unsplash.com/photo-1595152772835-219674b2a8a6?q=80&w=300&auto=format&fit=crop" # Agente tático retrato
+    url_escolta_direita = "https://images.unsplash.com/photo-1628157582853-a796fa650a6a?q=80&w=300&auto=format&fit=crop" # Agente operacional tático
     
-    with st.form(key='form_registro'):
-        col1, col2 = st.columns(2)
-        with col1:
-            encarregado_input = st.text_input("Encarregado", value=st.session_state['usuario_atual'])
-            localidade = st.selectbox("Localidade", options=lista_localidades)
-            balsa_input = st.text_input("Balsa")
-        with col2:
-            nome_escolta_input = st.text_input("Nome do Escolta")
-            data_atual = st.date_input("Data", agora_local.date(), format="DD/MM/YYYY")
-            hora_atual = st.time_input("Hora", agora_local.time())
-            
-        observacao_input = st.text_area("Observação")
-        botao_enviar = st.form_submit_button("Registrar Presença")
+    # --- ESQUEMA DE TRÊS COLUNAS: Escolta Esquerda | Painel Central | Escolta Direita ---
+    col_lateral_esq, col_central_painel, col_lateral_dir = st.columns([1, 4, 1])
+    
+    # LADO ESQUERDO: Imagem do Escolta
+    with col_lateral_esq:
+        st.image(url_escolta_esquerda, caption="Segurança Ativa", use_container_width=True)
         
-        if botao_enviar:
-            if balsa_input and nome_escolta_input:
-                hora_str = hora_atual.strftime("%H:%M")
-                data_str = data_atual.strftime("%d/%m/%Y")
+    # LADO DIREITO: Imagem do Escolta
+    with col_lateral_dir:
+        st.image(url_escolta_direita, caption="Pronto Emprego", use_container_width=True)
+        
+    # PAINEL CENTRAL: Formulário principal de Registro
+    with col_central_painel:
+        lista_localidades = ["MIRITITUBA", "SANTARÉM", "BELÉM", "MANAUS", "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"]
+        fuso_horario = dt.timezone(dt.timedelta(hours=-3))
+        agora_local = datetime.now(fuso_horario)
+        
+        with st.form(key='form_registro'):
+            c1, c2 = st.columns(2)
+            with c1:
+                encarregado_input = st.text_input("Encarregado", value=st.session_state['usuario_atual'])
+                localidade = st.selectbox("Localidade", options=lista_localidades)
+                balsa_input = st.text_input("Balsa")
+            with c2:
+                nome_escolta_input = st.text_input("Nome do Escolta")
+                data_atual = st.date_input("Data", agora_local.date(), format="DD/MM/YYYY")
+                hora_atual = st.time_input("Hora", agora_local.time())
                 
-                encarregado = encarregado_input.strip().upper()
-                balsa = balsa_input.strip().upper()
-                nome_escolta = nome_escolta_input.strip().upper()
-                observacao = observacao_input.strip().upper()
-                
-                salvar_registro(encarregado, localidade, balsa, nome_escolta, data_str, hora_str, observacao)
-                st.success("✅ REGISTRO SALVO COM SUCESSO!")
-                st.rerun()
-            else:
-                st.error("⚠️ Por favor, preencha os campos obrigatórios (Balsa e Nome do Escolta).")
+            observacao_input = st.text_area("Observação")
+            botao_enviar = st.form_submit_button("Registrar Presença")
+            
+            if botao_enviar:
+                if balsa_input and nome_escolta_input:
+                    hora_str = hora_atual.strftime("%H:%M")
+                    data_str = data_atual.strftime("%d/%m/%Y")
+                    
+                    encarregado = encarregado_input.strip().upper()
+                    balsa = balsa_input.strip().upper()
+                    nome_escolta = nome_escolta_input.strip().upper()
+                    observacao = observacao_input.strip().upper()
+                    
+                    salvar_registro(encarregado, localidade, balsa, nome_escolta, data_str, hora_str, observacao)
+                    st.success("✅ REGISTRO SALVO COM SUCESSO!")
+                    st.rerun()
+                else:
+                    st.error("⚠️ Por favor, preencha os campos obrigatórios (Balsa e Nome do Escolta).")
 
     st.markdown("---")
     st.subheader("📊 Histórico de Frequência")
     
-    # Painel de controle estrutural caso queira redefinir a tabela do zero
     if st.session_state['usuario_atual'] == 'admin':
         if st.button("⚠️ Redefinir Banco de Dados (Limpar Histórico Completo)"):
             conn = sqlite3.connect('registro_presenca.db')
@@ -231,7 +232,7 @@ def tela_sistema():
             conn.commit()
             conn.close()
             iniciar_e_atualizar_bd()
-            st.success("Tabela recriada com sucesso com as novas colunas!")
+            st.success("Banco de dados reiniciado operacionalmente!")
             st.rerun()
             
     df_registros = buscar_registros_df()
@@ -252,7 +253,7 @@ def tela_sistema():
             except Exception as e:
                 st.error(f"Erro ao processar PDF: {e}")
     else:
-        st.info("Nenhum registro encontrado até o momento.")
+        st.info("Nenhum registro de escolta ativo encontrado no momento.")
 
 # --- FLUXO PRINCIPAL ---
 if not st.session_state['logado']:
