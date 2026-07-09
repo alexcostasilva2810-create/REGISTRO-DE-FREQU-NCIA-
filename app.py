@@ -16,7 +16,7 @@ def iniciar_bd():
             encarregado TEXT,
             localidade TEXT,
             balsa TEXT,
-            nome_esc TEXT,
+            nome_escoltas TEXT,
             data TEXT,
             hora TEXT,
             observacao TEXT
