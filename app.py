@@ -6,10 +6,10 @@ import datetime as dt
 from fpdf import FPDF
 from io import BytesIO
 
-# --- CONFIGURAÇÃO VISUAL (CSS COM IMAGEM DE FUNDO PORTUÁRIO ONLINE) ---
+# --- CONFIGURAÇÃO VISUAL (CSS COM IMAGEM DE PESSOAS EM OPERAÇÃO PORTUÁRIA) ---
 def carregar_css_com_fundo():
-    # Usando uma imagem profissional de operação portuária via URL pública confiável
-    url_imagem = "https://images.unsplash.com/photo-1578575437130-527eed3abbec?q=80&w=1920&auto=format&fit=crop"
+    # Imagem focada em trabalhadores/equipe em operação portuária logística
+    url_imagem = "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=1200&auto=format&fit=crop"
     
     css_string = f"""
     <style>
@@ -18,36 +18,48 @@ def carregar_css_com_fundo():
         background-size: cover;
         background-repeat: no-repeat;
         background-attachment: fixed;
+        background-position: center;
     }}
 
-    /* Caixa semitransparente para proteger o texto e dar excelente leitura */
-    h1, h2, h3, p, .stMarkdown, div[data-baseweb="select"] {{
-        background-color: rgba(255, 255, 255, 0.90);
-        padding: 6px 12px;
+    /* Container semitransparente reforçado para garantir leitura absoluta das mensagens de erro ou texto */
+    h1, h2, h3, p, .stMarkdown, div[data-baseweb="select"], .stAlert {{
+        background-color: rgba(255, 255, 255, 0.94);
+        padding: 8px 14px;
         border-radius: 6px;
-        color: #1E293B !important;
+        color: #0F172A !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }}
     
-    /* Inputs totalmente visíveis */
+    /* Cobertura para blocos de exceção/tracebacks do Streamlit ficarem legíveis */
+    .stException {{
+        background-color: rgba(255, 233, 233, 0.96) !important;
+        border: 1px solid #EF4444 !important;
+        border-radius: 6px;
+        padding: 15px;
+    }}
+    
+    /* Inputs visíveis */
     .stTextInput>div>div>input, .stForm {{
         background-color: white !important;
     }}
     
     /* Estilização da tabela */
     [data-testid="stDataFrame"] {{
-        background-color: rgba(255, 255, 255, 0.95) !important;
+        background-color: rgba(255, 255, 255, 0.96) !important;
         border-radius: 6px;
         padding: 5px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }}
     </style>
     """
     st.markdown(css_string, unsafe_allow_html=True)
 
-# --- CONFIGURAÇÃO DO BANCO DE DADOS ---
-def iniciar_bd():
+# --- CONFIGURAÇÃO E CORREÇÃO AUTOMÁTICA DO BANCO DE DADOS ---
+def iniciar_e_atualizar_bd():
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
-    # Criando a tabela garantindo a coluna correta
+    
+    # 1. Cria a tabela se não existir
     c.execute('''
         CREATE TABLE IF NOT EXISTS frequencia (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,6 +72,17 @@ def iniciar_bd():
             observacao TEXT
         )
     ''')
+    
+    # 2. Correção Inteligente: Verifica se a coluna antiga 'nome_esc' ainda existe e migra para 'nome_escolta'
+    c.execute("PRAGMA table_info(frequencia)")
+    colunas = [col[1] for col in c.fetchall()]
+    
+    if "nome_esc" in colunas and "nome_escolta" not in colunas:
+        try:
+            c.execute("ALTER TABLE frequencia RENAME COLUMN nome_esc TO nome_escolta")
+        except Exception:
+            pass
+            
     conn.commit()
     conn.close()
 
@@ -76,20 +99,25 @@ def salvar_registro(encarregado, localidade, balsa, nome_escolta, data, hora, ob
 def buscar_registros_df():
     conn = sqlite3.connect('registro_presenca.db')
     try:
+        # Tenta a busca padrão estruturada
         query = "SELECT encarregado, localidade, balsa, nome_escolta, data, hora, observacao FROM frequencia"
         df = pd.read_sql_query(query, conn)
-        df.columns = ["Encarregado", "Localidade", "Balsa", "Nome do Escolta", "Data", "Hora", "Observação"]
     except Exception:
-        # CASO A TABELA ANTIGA ESTEJA TRAVANDO: Tenta ler com o nome antigo para não quebrar a tela
-        query = "SELECT encarregado, localidade, balsa, nome_esc, data, hora, observacao FROM frequencia"
+        # Fallback de segurança absoluto caso ocorra divergência residual
+        query = "SELECT * FROM frequencia"
         df = pd.read_sql_query(query, conn)
-        df.columns = ["Encarregado", "Localidade", "Balsa", "Nome do Escolta", "Data", "Hora", "Observação"]
-    finally:
-        conn.close()
+        # Remove ID se ele vier na consulta genérica para mapear corretamente
+        if 'id' in df.columns:
+            df = df.drop(columns=['id'])
+            
+    conn.close()
+    
+    # Força a nomeação amigável e correta das colunas na interface
+    df.columns = ["Encarregado", "Localidade", "Balsa", "Nome do Escolta", "Data", "Hora", "Observação"]
     return df
 
-# Inicializa o banco de dados
-iniciar_bd()
+# Executa o sincronismo automático de tabelas
+iniciar_e_atualizar_bd()
 
 # --- FUNÇÃO PARA GERAR PDF ---
 def gerar_pdf(df):
@@ -194,16 +222,16 @@ def tela_sistema():
     st.markdown("---")
     st.subheader("📊 Histórico de Frequência")
     
-    # IMPORTANTE: Botão para forçar a correção das colunas no servidor remoto
+    # Painel de controle estrutural caso queira redefinir a tabela do zero
     if st.session_state['usuario_atual'] == 'admin':
-        if st.button("🔄 Corrigir e Sincronizar Tabelas (Reset Necessário)"):
+        if st.button("⚠️ Redefinir Banco de Dados (Limpar Histórico Completo)"):
             conn = sqlite3.connect('registro_presenca.db')
             c = conn.cursor()
             c.execute("DROP TABLE IF EXISTS frequencia")
             conn.commit()
             conn.close()
-            iniciar_bd()
-            st.warning("Estrutura atualizada com sucesso!")
+            iniciar_e_atualizar_bd()
+            st.success("Tabela recriada com sucesso com as novas colunas!")
             st.rerun()
             
     df_registros = buscar_registros_df()
@@ -226,7 +254,7 @@ def tela_sistema():
     else:
         st.info("Nenhum registro encontrado até o momento.")
 
-# --- FLUXO ---
+# --- FLUXO PRINCIPAL ---
 if not st.session_state['logado']:
     tela_login()
 else:
