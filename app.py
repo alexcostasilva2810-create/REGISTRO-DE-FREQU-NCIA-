@@ -1,11 +1,14 @@
 import streamlit as st
 import sqlite3
+import pandas as pd
 from datetime import datetime
+from fpdf import FPDF
 
 # --- CONFIGURAÇÃO DO BANCO DE DADOS ---
 def iniciar_bd():
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
+    # Cria a tabela com a estrutura exata e correta
     c.execute('''
         CREATE TABLE IF NOT EXISTS frequencia (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,22 +34,55 @@ def salvar_registro(encarregado, localidade, balsa, nome_esc, data, hora, observ
     conn.commit()
     conn.close()
 
-def buscar_registros():
+def buscar_registros_df():
     conn = sqlite3.connect('registro_presenca.db')
-    c = conn.cursor()
-    c.execute("SELECT encarregado, localidade, balsa, nome_esc, data, hora, observacao FROM frequencia")
-    dados = c.fetchall()
+    # Força a leitura trazendo exatamente a ordem correta das colunas
+    query = "SELECT encarregado, localidade, balsa, nome_esc, data, hora, observacao FROM frequencia"
+    df = pd.read_sql_query(query, conn)
     conn.close()
-    return dados
+    
+    # Renomeia as colunas do DataFrame para garantir o mapeamento visual correto
+    df.columns = ["Encarregado", "Localidade", "Balsa", "Nome do Esc.", "Data", "Hora", "Observação"]
+    return df
 
-# Inicializa o banco de dados ao abrir o app
+# Inicializa o banco de dados
 iniciar_bd()
+
+# --- FUNÇÃO PARA GERAR PDF ---
+def gerar_pdf(df):
+    pdf = FPDF(orientation="L", unit="mm", format="A4") # Paisagem para caber todas as colunas
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    
+    # Título do PDF
+    pdf.cell(0, 10, "Relatorio de Frequencia e Presenca", ln=True, align="C")
+    pdf.ln(10)
+    
+    # Cabeçalho da Tabela
+    pdf.set_font("Helvetica", "B", 10)
+    col_larguras = [35, 35, 30, 55, 25, 25, 75] # Largura das colunas em mm
+    colunas = list(df.columns)
+    
+    for i, col in enumerate(colunas):
+        pdf.cell(col_larguras[i], 8, col, border=1, align="C")
+    pdf.ln()
+    
+    # Dados da Tabela
+    pdf.set_font("Helvetica", "", 9)
+    for _, row in df.iterrows():
+        for i, col in enumerate(colunas):
+            # Remove acentos e caracteres especiais para evitar erro no PDF básico
+            texto = str(row[col]).encode('latin-1', 'replace').decode('latin-1')
+            pdf.cell(col_larguras[i], 8, texto, border=1, align="L" if i == 6 else "C")
+        pdf.ln()
+        
+    return pdf.output()
 
 # --- CONTROLE DE SESSÃO (LOGIN) ---
 if 'logado' not in st.session_state:
     st.session_state['logado'] = False
 
-# Usuários simulados
+# Usuários
 USUARIOS_VALIDOS = {
     "admin": "1234",
     "supervisor": "senha123"
@@ -80,14 +116,8 @@ def tela_sistema():
     st.subheader("✍️ Nova Conferência de Frequência")
     
     lista_localidades = [
-        "MIRITITUBA",
-        "SANTARÉM",
-        "BELÉM",
-        "MANAUS",
-        "TROMBETAS",
-        "JURUTIR",
-        "PORTO VELHO",
-        "NOVO REMANSO"
+        "MIRITITUBA", "SANTARÉM", "BELÉM", "MANAUS", 
+        "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"
     ]
     
     with st.form(key='form_registro', clear_on_submit=True):
@@ -109,8 +139,10 @@ def tela_sistema():
         
         if botao_enviar:
             if balsa and nome_esc:
+                # Salva a data estritamente formatada em formato PT-BR
                 data_str = data_atual.strftime("%d/%m/%Y")
-                hora_str = hora_atual.strftime("%H:%M:%S")
+                hora_str = hora_atual.strftime("%H:%M")
+                
                 salvar_registro(encarregado, localidade, balsa, nome_esc, data_str, hora_str, observacao)
                 st.success("✅ Registro salvo com sucesso!")
                 st.rerun()
@@ -121,11 +153,38 @@ def tela_sistema():
     
     # Visualização da Tabela de Registros
     st.subheader("📊 Histórico de Frequência")
-    registros = buscar_registros()
     
-    if registros:
-        colunas = ["Encarregado", "Localidade", "Balsa", "Nome do Esc.", "Data", "Hora", "Observação"]
-        st.dataframe(registros, column_config={i: col for i, col in enumerate(colunas)}, use_container_width=True)
+    # Botão de Reset de Banco para Administrador (Caso precise limpar dados desalinhados antigos)
+    if st.session_state['usuario_atual'] == 'admin':
+        if st.button("⚠️ Limpar Histórico Antigo (Apagar Tabela/Reset)"):
+            conn = sqlite3.connect('registro_presenca.db')
+            c = conn.cursor()
+            c.execute("DROP TABLE IF EXISTS frequencia")
+            conn.commit()
+            conn.close()
+            iniciar_bd()
+            st.warning("O banco de dados foi resetado para corrigir o alinhamento das colunas!")
+            st.rerun()
+            
+    df_registros = buscar_registros_df()
+    
+    if not df_registros.empty:
+        # Exibe a tabela mapeando via Pandas (Garante 100% que as colunas fiquem no lugar certo)
+        st.dataframe(df_registros, use_container_width=True)
+        
+        # ÁREA DO ADMINISTRADOR: Exportar para PDF
+        if st.session_state['usuario_atual'] == 'admin':
+            st.markdown("### 🛠️ Painel do Administrador")
+            try:
+                pdf_bytes = gerar_pdf(df_registros)
+                st.download_button(
+                    label="📥 Exportar Histórico para PDF",
+                    data=pdf_bytes,
+                    file_name=f"historico_frequencia_{datetime.now().strftime('%d_%m_%Y')}.pdf",
+                    mime="application/pdf"
+                )
+            except Exception as e:
+                st.error(f"Erro ao gerar PDF: {e}")
     else:
         st.info("Nenhum registro encontrado até o momento.")
 
