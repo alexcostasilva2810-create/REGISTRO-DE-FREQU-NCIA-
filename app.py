@@ -2,6 +2,7 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 from datetime import datetime
+import datetime as dt
 from fpdf import FPDF
 from io import BytesIO
 
@@ -42,10 +43,10 @@ def buscar_registros_df():
     df.columns = ["Encarregado", "Localidade", "Balsa", "Nome do Esc.", "Data", "Hora", "Observação"]
     return df
 
-# Inicializa o banco de dados ao abrir o app
+# Inicializa o banco de dados
 iniciar_bd()
 
-# --- FUNÇÃO CORRETA PARA GERAR PDF EM MEMÓRIA ---
+# --- FUNÇÃO PARA GERAR PDF EM MEMÓRIA ---
 def gerar_pdf(df):
     pdf = FPDF(orientation="L", unit="mm", format="A4")
     pdf.add_page()
@@ -72,7 +73,6 @@ def gerar_pdf(df):
             pdf.cell(col_larguras[i], 8, texto, border=1, align="L" if i == 6 else "C")
         pdf.ln()
         
-    # Método seguro: Envia para um buffer de Bytes em vez de retornar direto
     pdf_buffer = BytesIO()
     pdf.output(pdf_buffer)
     pdf_buffer.seek(0)
@@ -119,6 +119,10 @@ def tela_sistema():
         "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"
     ]
     
+    # --- CORREÇÃO AUTOMÁTICA DE FUSO HORÁRIO (BRASÍLIA / BELÉM) ---
+    fuso_horario = dt.timezone(dt.timedelta(hours=-3))
+    agora_local = datetime.now(fuso_horario)
+    
     with st.form(key='form_registro', clear_on_submit=True):
         col1, col2 = st.columns(2)
         
@@ -129,8 +133,8 @@ def tela_sistema():
             
         with col2:
             nome_esc = st.text_input("Nome do Esc.")
-            data_atual = st.date_input("Data", datetime.now().date(), format="DD/MM/YYYY")
-            hora_atual = st.time_input("Hora", datetime.now().time())
+            data_atual = st.date_input("Data", agora_local.date(), format="DD/MM/YYYY")
+            hora_atual = st.time_input("Hora", agora_local.time())
             
         observacao = st.text_area("Observação")
             
@@ -152,7 +156,7 @@ def tela_sistema():
     # Visualização da Tabela de Registros
     st.subheader("📊 Histórico de Frequência")
     
-    # Botão de Reset para o Administrador limpar lixos de tabelas anteriores
+    # Botão de Reset para o Administrador limpar os dados com horários antigos desalinhados
     if st.session_state['usuario_atual'] == 'admin':
         if st.button("⚠️ Limpar Histórico Antigo (Apagar Tabela/Reset)"):
             conn = sqlite3.connect('registro_presenca.db')
@@ -161,7 +165,7 @@ def tela_sistema():
             conn.commit()
             conn.close()
             iniciar_bd()
-            st.warning("O banco de dados foi resetado para corrigir as colunas!")
+            st.warning("O banco de dados foi limpo. Faça um novo teste agora!")
             st.rerun()
             
     df_registros = buscar_registros_df()
@@ -169,7 +173,7 @@ def tela_sistema():
     if not df_registros.empty:
         st.dataframe(df_registros, use_container_width=True)
         
-        # PAINEL DO ADMINISTRADOR - DOWNLOAD DO PDF CORRIGIDO
+        # PAINEL DO ADMINISTRADOR
         if st.session_state['usuario_atual'] == 'admin':
             st.markdown("### 🛠️ Painel do Administrador")
             try:
