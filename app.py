@@ -6,8 +6,11 @@ import datetime as dt
 from fpdf import FPDF
 from io import BytesIO
 
-# --- CONFIGURAÇÃO VISUAL (CSS COM IMAGEM DE MONITORAMENTO OPERACIONAL) ---
+###############################################################################
+# BLOCO I: CONFIGURAÇÃO VISUAL E ESTILIZAÇÃO (CSS)
+###############################################################################
 def carregar_css_com_fundo():
+    # Imagem de fundo sutil de monitoramento operacional
     url_fundo = "https://images.unsplash.com/photo-1557597774-9d273605dfa9?q=80&w=1200&auto=format&fit=crop"
     
     css_string = f"""
@@ -20,7 +23,7 @@ def carregar_css_com_fundo():
         background-position: center;
     }}
 
-    /* Estilização dos blocos para contraste e leitura tática */
+    /* Blocos de texto e alertas com excelente contraste */
     h1, h2, h3, p, .stMarkdown, div[data-baseweb="select"], .stAlert {{
         background-color: rgba(255, 255, 255, 0.95);
         padding: 10px 15px;
@@ -29,13 +32,13 @@ def carregar_css_com_fundo():
         box-shadow: 0 4px 6px rgba(0,0,0,0.15);
     }}
     
-    /* Inputs visíveis */
+    /* Inputs visíveis e destacados */
     .stTextInput>div>div>input, .stForm {{
         background-color: white !important;
         border: 1px solid #1E293B !important;
     }}
     
-    /* Estilização da tabela */
+    /* Estilização da tabela de dados */
     [data-testid="stDataFrame"] {{
         background-color: rgba(255, 255, 255, 0.96) !important;
         border-radius: 6px;
@@ -46,9 +49,12 @@ def carregar_css_com_fundo():
     """
     st.markdown(css_string, unsafe_allow_html=True)
 
-# --- CONFIGURAÇÃO INTELIGENTE DO BANCO DE DADOS ---
-def obter_coluna_segura():
-    """Descobre dinamicamente se o BD usa 'nome_esc' ou 'nome_escolta' para evitar erros ao salvar"""
+
+###############################################################################
+# BLOCO II: CONEXÃO E GERENCIAMENTO DO BANCO DE DADOS (SQLITE3)
+###############################################################################
+def obtener_coluna_segura():
+    """Identifica se o banco usa 'nome_esc' ou 'nome_escolta' para evitar erros de gravação"""
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
     c.execute('''
@@ -72,11 +78,10 @@ def obter_coluna_segura():
     return "nome_escolta"
 
 def salvar_registro(encarregado, localidade, balsa, valor_escolta, data, hora, observacao):
-    coluna_ativa = obter_coluna_segura()
+    coluna_ativa = obtener_coluna_segura()
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
     
-    # Executa o INSERT usando dinamicamente a coluna que o banco possui no momento
     query = f'''
         INSERT INTO frequencia (encarregado, localidade, balsa, {coluna_ativa}, data, hora, observacao)
         VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -100,7 +105,10 @@ def buscar_registros_df():
     df.columns = ["Encarregado", "Localidade", "Balsa", "Nome do Escolta", "Data", "Hora", "Observação"]
     return df
 
-# --- FUNÇÃO PARA GERAR PDF ---
+
+###############################################################################
+# BLOCO III: EXPORTAÇÃO DE RELATÓRIOS (GERAÇÃO DE PDF)
+###############################################################################
 def gerar_pdf(df):
     pdf = FPDF(orientation="L", unit="mm", format="A4")
     pdf.add_page()
@@ -128,19 +136,28 @@ def gerar_pdf(df):
     pdf_buffer.seek(0)
     return pdf_buffer.getvalue()
 
-# --- CONTROLE DE SESSÃO (LOGIN) ---
+
+###############################################################################
+# BLOCO IV: CONTROLE DE SESSÃO E TELA DE LOGIN (7 USUÁRIOS CONFIGURADOS)
+###############################################################################
 if 'logado' not in st.session_state:
     st.session_state['logado'] = False
 
+# LISTA CONFIGURADA COM EXATAMENTE 7 USUÁRIOS OPERACIONAIS (Altere as senhas como desejar)
 USUARIOS_VALIDOS = {
     "admin": "1234",
-    "supervisor": "senha123"
+    "supervisor": "senha123",
+    "usuario3": "frequencia3",
+    "usuario4": "frequencia4",
+    "usuario5": "frequencia5",
+    "usuario6": "frequencia6",
+    "usuario7": "frequencia7"
 }
 
 def tela_login():
     carregar_css_com_fundo()
     st.subheader("⚡ CONTROLE DE ACESSO - OPERAÇÃO")
-    usuario = st.text_input("Usuário / Credencial")
+    usuario = st.text_input("Usuário / Credencial").strip().lower()
     senha = st.text_input("Senha", type="password")
     
     if st.button("Autenticar"):
@@ -151,7 +168,10 @@ def tela_login():
         else:
             st.error("Credenciais incorretas ou operador não autorizado.")
 
-# --- TELA PRINCIPAL DO SISTEMA ---
+
+###############################################################################
+# BLOCO V: TELA DO SISTEMA E FORMULÁRIO DE CADASTRO (COM LATERAIS VISUAIS)
+###############################################################################
 def tela_sistema():
     carregar_css_com_fundo()
     st.title("🛡️ Painel de Segurança e Frequência")
@@ -164,11 +184,11 @@ def tela_sistema():
     st.markdown("---")
     st.subheader("✍️ Nova Conferência de Frequência")
     
-    # Imagens verticais reais de agentes de segurança armada tática para as laterais do formulário
+    # Imagens verticais de escoltas táticos para as laterais do painel
     url_escolta_esquerda = "https://images.unsplash.com/photo-1579202673506-ca3ce28943ef?q=80&w=300&auto=format&fit=crop"
     url_escolta_direita = "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?q=80&w=300&auto=format&fit=crop"
     
-    # --- PROPORÇÃO DAS COLUNAS: 1 (Esquerda) | 4 (Formulário Central) | 1 (Direita) ---
+    # Layout em colunas: [Escolta Esquerda] [Painel Central] [Escolta Direita]
     col_lateral_esq, col_central_painel, col_lateral_dir = st.columns([1, 4, 1])
     
     with col_lateral_esq:
@@ -212,6 +232,10 @@ def tela_sistema():
                 else:
                     st.error("⚠️ Por favor, preencha os campos obrigatórios (Balsa e Nome do Escolta).")
 
+
+###############################################################################
+# BLOCO VI: HISTÓRICO DE FREQUÊNCIA E PAINEL ADM
+###############################################################################
     st.markdown("---")
     st.subheader("📊 Histórico de Frequência")
     
@@ -247,7 +271,10 @@ def tela_sistema():
     except Exception as e:
         st.error(f"Erro ao carregar os dados salvos: {e}")
 
-# --- FLUXO PRINCIPAL ---
+
+###############################################################################
+# BLOCO VII: FLUXO DE EXECUÇÃO PRINCIPAL
+###############################################################################
 if not st.session_state['logado']:
     tela_login()
 else:
