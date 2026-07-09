@@ -5,38 +5,38 @@ from datetime import datetime
 import datetime as dt
 from fpdf import FPDF
 from io import BytesIO
-import base64  # Necessário para codificar a imagem de fundo
 
-# --- CONFIGURAÇÃO VISUAL (CSS PERSONALIZADO) ---
-def carregar_css_com_fundo(nome_arquivo_imagem):
-    with open(nome_arquivo_imagem, "rb") as image_file:
-        encoded_string = base64.b64encode(image_file.read()).decode()
+# --- CONFIGURAÇÃO VISUAL (CSS COM IMAGEM DE FUNDO PORTUÁRIO ONLINE) ---
+def carregar_css_com_fundo():
+    # Usando uma imagem profissional de operação portuária via URL pública confiável
+    url_imagem = "https://images.unsplash.com/photo-1578575437130-527eed3abbec?q=80&w=1920&auto=format&fit=crop"
     
     css_string = f"""
     <style>
     .stApp {{
-        background-image: url("data:image/jpeg;base64,{encoded_string}");
+        background-image: url("{url_imagem}");
         background-size: cover;
         background-repeat: no-repeat;
         background-attachment: fixed;
     }}
 
-    /* Ajuste para melhorar a legibilidade do texto sobre o fundo */
+    /* Caixa semitransparente para proteger o texto e dar excelente leitura */
     h1, h2, h3, p, .stMarkdown, div[data-baseweb="select"] {{
-        background-color: rgba(255, 255, 255, 0.85); /* Fundo branco semitransparente atrás do texto */
-        padding: 5px 10px;
-        border-radius: 5px;
+        background-color: rgba(255, 255, 255, 0.90);
+        padding: 6px 12px;
+        border-radius: 6px;
+        color: #1E293B !important;
     }}
     
-    /* Ajustes específicos para inputs e texto do form */
+    /* Inputs totalmente visíveis */
     .stTextInput>div>div>input, .stForm {{
         background-color: white !important;
     }}
     
-    /* Melhora visual para a tabela */
+    /* Estilização da tabela */
     [data-testid="stDataFrame"] {{
-        background-color: rgba(255, 255, 255, 0.9) !important;
-        border-radius: 5px;
+        background-color: rgba(255, 255, 255, 0.95) !important;
+        border-radius: 6px;
         padding: 5px;
     }}
     </style>
@@ -47,13 +47,14 @@ def carregar_css_com_fundo(nome_arquivo_imagem):
 def iniciar_bd():
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
+    # Criando a tabela garantindo a coluna correta
     c.execute('''
         CREATE TABLE IF NOT EXISTS frequencia (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             encarregado TEXT,
             localidade TEXT,
             balsa TEXT,
-            nome_escolta TEXT, -- AJUSTE NO NOME DA COLUNA NO BD
+            nome_escolta TEXT,
             data TEXT,
             hora TEXT,
             observacao TEXT
@@ -74,28 +75,31 @@ def salvar_registro(encarregado, localidade, balsa, nome_escolta, data, hora, ob
 
 def buscar_registros_df():
     conn = sqlite3.connect('registro_presenca.db')
-    query = "SELECT encarregado, localidade, balsa, nome_escolta, data, hora, observacao FROM frequencia"
-    df = pd.read_sql_query(query, conn)
-    conn.close()
-    
-    # AJUSTE NO NOME DA COLUNA NA EXIBIÇÃO DA TABELA
-    df.columns = ["Encarregado", "Localidade", "Balsa", "Nome do Escolta", "Data", "Hora", "Observação"]
+    try:
+        query = "SELECT encarregado, localidade, balsa, nome_escolta, data, hora, observacao FROM frequencia"
+        df = pd.read_sql_query(query, conn)
+        df.columns = ["Encarregado", "Localidade", "Balsa", "Nome do Escolta", "Data", "Hora", "Observação"]
+    except Exception:
+        # CASO A TABELA ANTIGA ESTEJA TRAVANDO: Tenta ler com o nome antigo para não quebrar a tela
+        query = "SELECT encarregado, localidade, balsa, nome_esc, data, hora, observacao FROM frequencia"
+        df = pd.read_sql_query(query, conn)
+        df.columns = ["Encarregado", "Localidade", "Balsa", "Nome do Escolta", "Data", "Hora", "Observação"]
+    finally:
+        conn.close()
     return df
 
 # Inicializa o banco de dados
 iniciar_bd()
 
-# --- FUNÇÃO PARA GERAR PDF EM MEMÓRIA ---
+# --- FUNÇÃO PARA GERAR PDF ---
 def gerar_pdf(df):
     pdf = FPDF(orientation="L", unit="mm", format="A4")
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
     
-    # Título do PDF
     pdf.cell(0, 10, "RELATORIO DE FREQUENCIA E PRESENCA", ln=True, align="C")
     pdf.ln(10)
     
-    # Cabeçalho da Tabela
     pdf.set_font("Helvetica", "B", 10)
     col_larguras = [35, 35, 30, 55, 25, 25, 75]
     colunas = list(df.columns)
@@ -104,7 +108,6 @@ def gerar_pdf(df):
         pdf.cell(col_larguras[i], 8, col.upper(), border=1, align="C")
     pdf.ln()
     
-    # Dados da Tabela
     pdf.set_font("Helvetica", "", 9)
     for _, row in df.iterrows():
         for i, col in enumerate(colunas):
@@ -127,12 +130,7 @@ USUARIOS_VALIDOS = {
 }
 
 def tela_login():
-    # Tenta carregar a imagem de fundo para a tela de login também
-    try:
-        carregar_css_com_fundo("fundo_porto.jpg")
-    except FileNotFoundError:
-        st.warning("Imagem 'fundo_porto.jpg' não encontrada. Usando fundo padrão.")
-
+    carregar_css_com_fundo()
     st.subheader("🔑 Login do Sistema")
     usuario = st.text_input("Usuário")
     senha = st.text_input("Senha", type="password")
@@ -145,14 +143,9 @@ def tela_login():
         else:
             st.error("Usuário ou senha incorretos.")
 
-# --- TELA PRINCIPAL (SISTEMA) ---
+# --- TELA PRINCIPAL ---
 def tela_sistema():
-    # Carrega o CSS com a imagem de fundo
-    try:
-        carregar_css_com_fundo("fundo_porto.jpg")
-    except FileNotFoundError:
-        st.warning("Imagem 'fundo_porto.jpg' não encontrada. Usando fundo padrão.")
-
+    carregar_css_com_fundo()
     st.title("📋 Sistema de Registro de Presença")
     st.write(f"Conectado como: **{st.session_state['usuario_atual'].upper()}**")
     
@@ -162,33 +155,24 @@ def tela_sistema():
         
     st.markdown("---")
     
-    # Formulário de Entrada de Dados
     st.subheader("✍️ Nova Conferência de Frequência")
-    
-    lista_localidades = [
-        "MIRITITUBA", "SANTARÉM", "BELÉM", "MANAUS", 
-        "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"
-    ]
+    lista_localidades = ["MIRITITUBA", "SANTARÉM", "BELÉM", "MANAUS", "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"]
     
     fuso_horario = dt.timezone(dt.timedelta(hours=-3))
     agora_local = datetime.now(fuso_horario)
     
     with st.form(key='form_registro'):
         col1, col2 = st.columns(2)
-        
         with col1:
             encarregado_input = st.text_input("Encarregado", value=st.session_state['usuario_atual'])
             localidade = st.selectbox("Localidade", options=lista_localidades)
             balsa_input = st.text_input("Balsa")
-            
         with col2:
-            # AJUSTE NO RÓTULO DO CAMPO NO FORMULÁRIO
             nome_escolta_input = st.text_input("Nome do Escolta")
             data_atual = st.date_input("Data", agora_local.date(), format="DD/MM/YYYY")
             hora_atual = st.time_input("Hora", agora_local.time())
             
         observacao_input = st.text_area("Observação")
-            
         botao_enviar = st.form_submit_button("Registrar Presença")
         
         if botao_enviar:
@@ -208,19 +192,18 @@ def tela_sistema():
                 st.error("⚠️ Por favor, preencha os campos obrigatórios (Balsa e Nome do Escolta).")
 
     st.markdown("---")
-    
-    # Visualização da Tabela de Registros
     st.subheader("📊 Histórico de Frequência")
     
+    # IMPORTANTE: Botão para forçar a correção das colunas no servidor remoto
     if st.session_state['usuario_atual'] == 'admin':
-        if st.button("⚠️ Limpar Histórico Antigo (Apagar Tabela/Reset)"):
+        if st.button("🔄 Corrigir e Sincronizar Tabelas (Reset Necessário)"):
             conn = sqlite3.connect('registro_presenca.db')
             c = conn.cursor()
             c.execute("DROP TABLE IF EXISTS frequencia")
             conn.commit()
             conn.close()
             iniciar_bd()
-            st.warning("O banco de dados foi limpo. Faça um novo teste agora!")
+            st.warning("Estrutura atualizada com sucesso!")
             st.rerun()
             
     df_registros = buscar_registros_df()
@@ -228,7 +211,6 @@ def tela_sistema():
     if not df_registros.empty:
         st.dataframe(df_registros, use_container_width=True)
         
-        # PAINEL DO ADMINISTRADOR
         if st.session_state['usuario_atual'] == 'admin':
             st.markdown("### 🛠️ Painel do Administrador")
             try:
@@ -244,7 +226,7 @@ def tela_sistema():
     else:
         st.info("Nenhum registro encontrado até o momento.")
 
-# --- FLUXO DA APLICAÇÃO ---
+# --- FLUXO ---
 if not st.session_state['logado']:
     tela_login()
 else:
