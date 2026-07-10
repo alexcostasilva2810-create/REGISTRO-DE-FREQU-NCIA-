@@ -7,7 +7,7 @@ from fpdf import FPDF
 from io import BytesIO
 
 ###############################################################################
-# CONFIGURAÇÃO COMPACTA DE PÁGINA
+# CONFIGURAÇÃO COMPACTA MÁXIMA DE PÁGINA
 ###############################################################################
 st.set_page_config(
     page_title="Controle",
@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 ###############################################################################
-# BLOCO I: DESIGN COMPACTO (CSS MINIMALISTA)
+# BLOCO I: DESIGN ULTRA-COMPACTO (CSS SLIM)
 ###############################################################################
 def carregar_css_com_fundo():
     url_fundo = "https://images.unsplash.com/photo-1557597774-9d273605dfa9?q=80&w=1200&auto=format&fit=crop"
@@ -31,46 +31,58 @@ def carregar_css_com_fundo():
         background-position: center;
     }}
     
+    /* Remove espaços vazios do topo e fundo */
     .block-container {{
-        padding-top: 1rem !important;
-        padding-bottom: 1rem !important;
+        padding-top: 0.2rem !important;
+        padding-bottom: 0.2rem !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
     }}
     
     h1 {{
-        font-size: 20px !important;
-        margin-bottom: 5px !important;
-        padding: 5px !important;
+        font-size: 16px !important;
+        margin: 2px 0px !important;
+        padding: 2px !important;
         text-align: center;
-    }}
-    
-    h3, p, .stMarkdown, div[data-baseweb="select"], .stAlert {{
         background-color: rgba(255, 255, 255, 0.96);
-        padding: 6px 10px !important;
-        border-radius: 6px;
-        color: #0F172A !important;
-        font-size: 14px !important;
-        margin-bottom: 4px !important;
+        border-radius: 4px;
     }}
     
-    .stTextInput>div>div>input, .stForm {{
+    /* Elementos menores e com pouca margem */
+    div[data-testid="stForm"] {{
+        padding: 6px !important;
+        background-color: rgba(255, 255, 255, 0.95);
+        border-radius: 6px;
+        margin-bottom: 2px !important;
+    }}
+    
+    .stTextInput>div>div>input, div[data-baseweb="select"]>div, .stForm {{
         background-color: white !important;
         border: 1px solid #1E293B !important;
-        height: 35px !important;
-        font-size: 14px !important;
+        height: 28px !important;
+        font-size: 12px !important;
     }}
     
-    div[data-testid="stForm"] {{
-        padding: 10px !important;
-        background-color: rgba(255, 255, 255, 0.95);
-        border-radius: 8px;
+    label {{
+        font-size: 11px !important;
+        margin-bottom: 1px !important;
+        font-weight: bold !important;
     }}
     
+    /* Botão Slim */
     .stButton>button {{
         width: 100% !important;
-        height: 40px !important;
-        font-size: 14px !important;
+        height: 32px !important;
+        font-size: 13px !important;
         background-color: #1E293B !important;
         color: white !important;
+        margin-top: 5px !important;
+    }}
+    
+    /* Histórico Compactado */
+    [data-testid="stDataFrame"] {{
+        background-color: rgba(255, 255, 255, 0.96) !important;
+        font-size: 11px !important;
     }}
     </style>
     """
@@ -78,7 +90,7 @@ def carregar_css_com_fundo():
 
 
 ###############################################################################
-# BLOCO II: CONEXÃO E GERENCIAMENTO DO BANCO DE DADOS (SQLITE3)
+# BLOCO II: BANCO DE DADOS (SQLITE3)
 ###############################################################################
 def inicializar_banco_seguro():
     conn = sqlite3.connect('registro_presenca.db')
@@ -124,7 +136,7 @@ def salvar_registro(encarregado, localidade, balsa, valor_escolta, data, hora, o
     conn.close()
 
 def buscar_registros_df(usuario_atual):
-    inicializar_banco_seguro() # Corrige o erro "no such table: frequencia" caso ela suma
+    inicializar_banco_seguro()
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
     c.execute("PRAGMA table_info(frequencia)")
@@ -146,7 +158,7 @@ def buscar_registros_df(usuario_atual):
 
 
 ###############################################################################
-# BLOCO III: EXPORTAÇÃO DE RELATÓRIOS (GERAÇÃO DE PDF)
+# BLOCO III: RELATÓRIOS (PDF)
 ###############################################################################
 def gerar_pdf(df):
     pdf = FPDF(orientation="L", unit="mm", format="A4")
@@ -182,7 +194,6 @@ def gerar_pdf(df):
 if 'logado' not in st.session_state:
     st.session_state['logado'] = False
 
-# ADICIONADO O USUÁRIO ELTON E SUA SENHA DO PRINT
 USUARIOS_VALIDOS = {
     "admin": "1234",
     "supervisor": "senha123",
@@ -207,17 +218,17 @@ def tela_login():
             st.session_state['usuario_atual'] = usuario
             st.rerun()
         else:
-            st.error("Credenciais incorretas.")
+            st.error("Incorreto.")
 
 
 ###############################################################################
-# BLOCO V: INTERFACE TOTALMENTE COMPACTADA
+# BLOCO V: INTERFACE TOTALMENTE COMPACTADA EM LINHAS TRIPLAS
 ###############################################################################
 def tela_sistema():
     carregar_css_com_fundo()
     usuario_sessao = st.session_state['usuario_atual']
     
-    st.sidebar.write(f"Olá, **{usuario_sessao.upper()}**")
+    st.sidebar.write(f"Operador: **{usuario_sessao.upper()}**")
     if st.sidebar.button("🚪 Sair", use_container_width=True):
         st.session_state['logado'] = False
         st.rerun()
@@ -250,17 +261,25 @@ def tela_sistema():
     st.title("🛡️ Painel Operacional")
     
     with st.form(key='form_registro'):
-        cb1, cb2 = st.columns(2)
-        with cb1:
+        # Linha 1 do Formulário
+        c1, c2, c3 = st.columns(3)
+        with c1:
             encarregado_input = st.text_input("Encarregado", value=usuario_sessao.upper(), disabled=(usuario_sessao != 'admin'))
+        with c2:
             lista_localidades = ["MIRITITUBA", "SANTARÉM", "BELÉM", "MANAUS", "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"]
             localidade = st.selectbox("Localidade", options=lista_localidades)
+        with c3:
             balsa_input = st.text_input("Balsa")
-        with cb2:
+            
+        # Linha 2 do Formulário
+        c4, c5, c6 = st.columns(3)
+        with c4:
             nome_escolta_input = st.text_input("Escolta")
+        with c5:
             fuso_horario = dt.timezone(dt.timedelta(hours=-3))
             agora_local = datetime.now(fuso_horario)
             data_atual = st.date_input("Data", agora_local.date(), format="DD/MM/YYYY")
+        with c6:
             hora_atual = st.time_input("Hora", agora_local.time())
             
         observacao_input = st.text_input("Observação")
@@ -284,12 +303,11 @@ def tela_sistema():
                 st.success("Salvo!")
                 st.rerun()
             else:
-                st.error("Preencha os campos.")
+                st.error("Preencha balsa e escolta.")
 
-    st.markdown("---")
-    st.write("**Histórico Operacional**")
+    st.write("**Histórico Recente**")
     if not df_registros.empty:
-        st.dataframe(df_registros, use_container_width=True)
+        st.dataframe(df_registros, use_container_width=True, height=150) # Altura fixa para não empurrar a tela
     else:
         st.info("Vazio.")
 
