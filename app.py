@@ -7,16 +7,16 @@ from fpdf import FPDF
 from io import BytesIO
 
 ###############################################################################
-# CONFIGURAÇÃO DE PÁGINA
+# CONFIGURAÇÃO DE PÁGINA ORIGEM
 ###############################################################################
 st.set_page_config(
-    page_title="Controle",
-    layout="centered",  # Centralizado evita o espalhamento exagerado nas laterais
-    initial_sidebar_state="collapsed"
+    page_title="Controle de Frequência",
+    layout="centered",
+    initial_sidebar_state="expanded"
 )
 
 ###############################################################################
-# BLOCO I: DESIGN VERTICAL COMPACTO E LIMPO
+# BLOCO I: ESTILIZAÇÃO DO LAYOUT ORIGINAL
 ###############################################################################
 def carregar_css_com_fundo():
     url_fundo = "https://images.unsplash.com/photo-1557597774-9d273605dfa9?q=80&w=1200&auto=format&fit=crop"
@@ -31,66 +31,31 @@ def carregar_css_com_fundo():
         background-position: center;
     }}
     
-    /* Limita o tamanho máximo do formulário central */
     .block-container {{
-        max-width: 550px !important;
-        padding-top: 1rem !important;
-        padding-bottom: 1rem !important;
+        max-width: 800px !important;
+        padding-top: 2rem !important;
+        padding-bottom: 2rem !important;
     }}
     
-    h1 {{
-        font-size: 20px !important;
-        margin-bottom: 10px !important;
-        text-align: center;
-        color: #1E293B !important;
-        background-color: rgba(255, 255, 255, 0.95);
-        padding: 8px !important;
-        border-radius: 6px;
-    }}
-    
-    /* Box do formulário na vertical */
+    /* Box do Formulário Original */
     div[data-testid="stForm"] {{
-        padding: 15px !important;
-        background-color: rgba(255, 255, 255, 0.96) !important;
+        background-color: rgba(255, 255, 255, 0.95) !important;
+        padding: 25px !important;
+        border-radius: 10px !important;
+        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
+    }}
+    
+    /* Título Superior */
+    .titulo-principal {{
+        background-color: #f8fafc;
+        padding: 15px;
         border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }}
-    
-    /* Configuração padrão dos inputs e seletores */
-    .stTextInput>div>div>input, div[data-baseweb="select"]>div, .stForm {{
-        background-color: white !important;
-        border: 1px solid #CBD5E1 !important;
-        height: 38px !important;
-        font-size: 14px !important;
-        border-radius: 4px !important;
-    }}
-    
-    label {{
-        font-size: 13px !important;
-        font-weight: 600 !important;
-        color: #334155 !important;
-        margin-bottom: 2px !important;
-    }}
-    
-    /* Botão de Envio */
-    .stButton>button {{
-        width: 100% !important;
-        height: 42px !important;
-        font-size: 14px !important;
-        font-weight: bold !important;
-        background-color: #1E293B !important;
-        color: white !important;
-        border-radius: 4px !important;
-        border: none !important;
-        margin-top: 10px !important;
-    }}
-    
-    /* Container do Histórico */
-    .historico-container {{
-        background-color: rgba(255, 255, 255, 0.96);
-        padding: 10px;
-        border-radius: 8px;
-        margin-top: 15px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 24px;
+        color: #1e293b;
+        margin-bottom: 20px;
+        border: 1px solid #e2e8f0;
     }}
     </style>
     """
@@ -215,40 +180,46 @@ USUARIOS_VALIDOS = {
 
 def tela_login():
     carregar_css_com_fundo()
-    st.subheader("⚡ LOGIN")
+    st.markdown('<div class="titulo-principal">⚡ CONTROLE DE ACESSO</div>', unsafe_allow_html=True)
     
-    usuario = st.text_input("Usuário").strip().lower()
-    senha = st.text_input("Senha", type="password")
-    
-    if st.button("Entrar"):
-        if usuario in USUARIOS_VALIDOS and str(USUARIOS_VALIDOS[usuario]) == str(senha):
-            st.session_state['logado'] = True
-            st.session_state['usuario_atual'] = usuario
-            st.rerun()
-        else:
-            st.error("Incorreto.")
+    with st.form(key='form_login'):
+        usuario = st.text_input("Usuário / Credencial").strip().lower()
+        senha = st.text_input("Senha", type="password")
+        botao_login = st.form_submit_button("Autenticar")
+        
+        if botao_login:
+            if usuario in USUARIOS_VALIDOS and str(USUARIOS_VALIDOS[usuario]) == str(senha):
+                st.session_state['logado'] = True
+                st.session_state['usuario_atual'] = usuario
+                st.rerun()
+            else:
+                st.error("Credenciais incorretas ou operador não autorizado.")
 
 
 ###############################################################################
-# BLOCO V: INTERFACE VERTICAL ORGANIZADA E CONCISA
+# BLOCO V: TELA DO SISTEMA ORIGINAL (DUAS COLUNAS PARALELAS)
 ###############################################################################
 def tela_sistema():
     carregar_css_com_fundo()
     usuario_sessao = st.session_state['usuario_atual']
     
-    st.sidebar.write(f"Operador: **{usuario_sessao.upper()}**")
-    if st.sidebar.button("🚪 Sair", use_container_width=True):
+    # Sidebar
+    st.sidebar.title("Menu")
+    st.sidebar.write(f"Operador Ativo: **{usuario_sessao.upper()}**")
+    if st.sidebar.button("🚪 Sair do Sistema", use_container_width=True):
         st.session_state['logado'] = False
         st.rerun()
         
     df_registros = buscar_registros_df(usuario_sessao)
     
     if usuario_sessao == 'admin':
+        st.sidebar.markdown("---")
+        st.sidebar.write("**Painel Admin**")
         if not df_registros.empty:
             try:
                 pdf_bytes = gerar_pdf(df_registros)
                 st.sidebar.download_button(
-                    label="📥 Exportar PDF",
+                    label="📥 Exportar para PDF",
                     data=pdf_bytes,
                     file_name=f"frequencia_{datetime.now().strftime('%d_%m_%Y')}.pdf",
                     mime="application/pdf",
@@ -257,7 +228,7 @@ def tela_sistema():
             except Exception as e:
                 st.sidebar.error(f"Erro PDF: {e}")
                 
-        if st.sidebar.button("⚠️ Limpar Banco", use_container_width=True):
+        if st.sidebar.button("⚠️ Limpar Banco de Dados", use_container_width=True):
             conn = sqlite3.connect('registro_presenca.db')
             c = conn.cursor()
             c.execute("DROP TABLE IF EXISTS frequencia")
@@ -266,30 +237,29 @@ def tela_sistema():
             inicializar_banco_seguro()
             st.rerun()
 
-    st.title("🛡️ Painel Operacional")
+    # Título do Formulário
+    st.markdown('<div class="titulo-principal">📝 Nova Conferência de Frequência</div>', unsafe_allow_html=True)
     
+    # Estrutura de colunas idêntica à foto de origem
     with st.form(key='form_registro'):
-        encarregado_input = st.text_input("Encarregado", value=usuario_sessao.upper(), disabled=(usuario_sessao != 'admin'))
+        col1, col2 = st.columns(2)
         
-        lista_localidades = ["MIRITITUBA", "SANTARÉM", "BELÉM", "MANAUS", "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"]
-        localidade = st.selectbox("Localidade", options=lista_localidades)
-        
-        balsa_input = st.text_input("Balsa")
-        nome_escolta_input = st.text_input("Escolta")
-        
-        fuso_horario = dt.timezone(dt.timedelta(hours=-3))
-        agora_local = datetime.now(fuso_horario)
-        
-        # Apenas data e hora divididas horizontalmente de forma sutil
-        c_data, c_hora = st.columns(2)
-        with c_data:
+        with col1:
+            encarregado_input = st.text_input("Encarregado", value=usuario_sessao.upper(), disabled=(usuario_sessao != 'admin'))
+            lista_localidades = ["MIRITITUBA", "SANTARÉM", "BELÉM", "MANAUS", "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"]
+            localidade = st.selectbox("Localidade", options=lista_localidades)
+            balsa_input = st.text_input("Balsa")
+            
+        with col2:
+            nome_escolta_input = st.text_input("Nome do Escolta")
+            fuso_horario = dt.timezone(dt.timedelta(hours=-3))
+            agora_local = datetime.now(fuso_horario)
             data_atual = st.date_input("Data", agora_local.date(), format="DD/MM/YYYY")
-        with c_hora:
             hora_atual = st.time_input("Hora", agora_local.time())
             
-        observacao_input = st.text_input("Observação")
+        observacao_input = st.text_area("Observação", value="", height=100)
         
-        botao_enviar = st.form_submit_button("SALVAR REGISTRO")
+        botao_enviar = st.form_submit_button("Registrar Presença")
         
         if botao_enviar:
             if balsa_input and nome_escolta_input:
@@ -305,23 +275,22 @@ def tela_sistema():
                     hora_str, 
                     observacao_input.strip().upper()
                 )
-                st.success("Salvo com sucesso!")
+                st.success("Presença registrada com sucesso!")
                 st.rerun()
             else:
-                st.error("Por favor, preencha a Balsa e o Escolta.")
+                st.error("Por favor, preencha todos os campos obrigatórios (Balsa e Escolta).")
 
-    # Container próprio para o histórico para não embolar com o formulário
-    st.markdown('<div class="historico-container">', unsafe_allow_html=True)
-    st.write("**Histórico de Frequência**")
+    # Histórico abaixo do formulário
+    st.markdown("---")
+    st.subheader("📊 Histórico Operacional Geral")
     if not df_registros.empty:
-        st.dataframe(df_registros, use_container_width=True, height=180)
+        st.dataframe(df_registros, use_container_width=True)
     else:
-        st.info("Nenhum registro encontrado.")
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.info("Nenhum registro de frequência encontrado até o momento.")
 
 
 ###############################################################################
-# BLOCO VII: INICIALIZAÇÃO
+# BLOCO VII: INICIALIZAÇÃO DO FLUXO
 ###############################################################################
 inicializar_banco_seguro()
 
