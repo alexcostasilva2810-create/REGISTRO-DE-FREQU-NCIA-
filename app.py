@@ -85,7 +85,8 @@ def salvar_registro(encarregado, localidade, balsa, valor_escolta, data, hora, o
         INSERT INTO frequencia (encarregado, localidade, balsa, {coluna_ativa}, data, hora, observacao)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     '''
-    c.execute(query, (encarregado, localidade, balsa, valor_escolta, data, hora, observacao))
+    # Salvamos sempre em caixa alta para manter padronizado no banco
+    c.execute(query, (encarregado.strip().upper(), localidade, balsa, valor_escolta, data, hora, observacao))
     conn.commit()
     conn.close()
 
@@ -98,13 +99,13 @@ def buscar_registros_df(usuario_atual):
     
     coluna_busca = "nome_esc" if "nome_esc" in colunas else "nome_escolta"
     
-    # REGRA DE VISIBILIDADE CRÍTICA: Admin vê tudo, usuário comum vê apenas o dele
-    if usuario_atual == 'admin':
+    # Tratamento para ignorar maiúsculas/minúsculas no filtro
+    if usuario_atual.lower() == 'admin':
         query = f"SELECT encarregado, localidade, balsa, {coluna_busca}, data, hora, observacao FROM frequencia"
         df = pd.read_sql_query(query, conn)
     else:
         query = f"SELECT encarregado, localidade, balsa, {coluna_busca}, data, hora, observacao FROM frequencia WHERE UPPER(encarregado) = ?"
-        df = pd.read_sql_query(query, conn, params=(usuario_atual.upper(),))
+        df = pd.read_sql_query(query, conn, params=(usuario_atual.strip().upper(),))
         
     conn.close()
     
@@ -153,7 +154,7 @@ USUARIOS_VALIDOS = {
     "admin": "1234",
     "supervisor": "senha123",
     "janari": "223344",
-    "eriton": "451263",
+    "usuario4": "frequencia4",
     "usuario5": "frequencia5",
     "usuario6": "frequencia6",
     "usuario7": "frequencia7"
@@ -162,13 +163,15 @@ USUARIOS_VALIDOS = {
 def tela_login():
     carregar_css_com_fundo()
     st.subheader("⚡ CONTROLE DE ACESSO - OPERAÇÃO")
+    
+    # Tratando a entrada do usuário removendo espaços e convertendo para minúsculo
     usuario = st.text_input("Usuário / Credencial").strip().lower()
     senha = st.text_input("Senha", type="password")
     
     if st.button("Autenticar"):
         if usuario in USUARIOS_VALIDOS and str(USUARIOS_VALIDOS[usuario]) == str(senha):
             st.session_state['logado'] = True
-            st.session_state['usuario_atual'] = usuario
+            st.session_state['usuario_atual'] = usuario  # Salva sempre padronizado em minúsculo internamente
             st.rerun()
         else:
             st.error("Credenciais incorretas ou operador não autorizado.")
@@ -189,7 +192,6 @@ def tela_sistema():
         st.session_state['logado'] = False
         st.rerun()
         
-    # Busca os registros baseando-se no nível de privilégio do usuário logado
     df_registros = buscar_registros_df(usuario_sessao)
     
     # Restrição Exclusiva Admin na Lateral
