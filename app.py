@@ -153,7 +153,7 @@ USUARIOS_VALIDOS = {
     "admin": "1234",
     "supervisor": "senha123",
     "janari": "223344",
-    "usuario4": "frequencia4",
+    "eriton": "451263",
     "usuario5": "frequencia5",
     "usuario6": "frequencia6",
     "usuario7": "frequencia7"
