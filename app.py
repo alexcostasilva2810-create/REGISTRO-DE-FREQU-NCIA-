@@ -144,7 +144,7 @@ if 'logado' not in st.session_state:
 
 USUARIOS_VALIDOS = {
     "admin": "1234",
-    "supervisor": "senha123",
+    "Janari": "87654",
     "usuario3": "frequencia3",
     "usuario4": "frequencia4",
     "usuario5": "frequencia5",
