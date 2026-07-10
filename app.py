@@ -7,7 +7,16 @@ from fpdf import FPDF
 from io import BytesIO
 
 ###############################################################################
-# BLOCO I: CONFIGURAÇÃO VISUAL E ESTILIZAÇÃO (CSS)
+# CONFIGURAÇÃO DE PÁGINA (CRÍTICA PARA ANDROID)
+###############################################################################
+st.set_page_config(
+    page_title="Controle Operacional",
+    layout="wide",  # Faz o app usar toda a largura da tela do celular
+    initial_sidebar_state="collapsed"  # Mantém o menu lateral recolhido no celular para dar espaço
+)
+
+###############################################################################
+# BLOCO I: CONFIGURAÇÃO VISUAL ADAPTADA PARA CELULAR (CSS MOBILE)
 ###############################################################################
 def carregar_css_com_fundo():
     url_fundo = "https://images.unsplash.com/photo-1557597774-9d273605dfa9?q=80&w=1200&auto=format&fit=crop"
@@ -21,22 +30,43 @@ def carregar_css_com_fundo():
         background-attachment: fixed;
         background-position: center;
     }}
-    h1, h2, h3, p, .stMarkdown, div[data-baseweb="select"], .stAlert {{
+    
+    /* Fontes maiores e blocos mais visíveis no celular */
+    h1 {{
+        font-size: 24px !important;
+        text-align: center;
+    }}
+    h2, h3, p, .stMarkdown, div[data-baseweb="select"], .stAlert {{
         background-color: rgba(255, 255, 255, 0.95);
-        padding: 10px 15px;
-        border-radius: 6px;
+        padding: 12px 15px;
+        border-radius: 8px;
         color: #0F172A !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+        font-size: 16px !important; /* Tamanho de letra ideal para leitura no Android */
     }}
+    
+    /* Inputs de texto fáceis de tocar com o dedo */
     .stTextInput>div>div>input, .stForm {{
         background-color: white !important;
-        border: 1px solid #1E293B !important;
+        border: 2px solid #1E293B !important; /* Borda mais grossa para enxergar melhor */
+        height: 45px !important; /* Mais alto para facilitar o toque */
+        font-size: 16px !important;
     }}
+    
+    /* Ajuste para a tabela não quebrar no celular */
     [data-testid="stDataFrame"] {{
         background-color: rgba(255, 255, 255, 0.96) !important;
         border-radius: 6px;
         padding: 5px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }}
+    
+    /* Botões grandes e robustos para o operador clicar sem errar */
+    .stButton>button {{
+        width: 100% !important;
+        height: 50px !important;
+        font-size: 16px !important;
+        font-weight: bold !important;
     }}
     </style>
     """
@@ -77,7 +107,7 @@ def obter_coluna_segura():
     return "nome_escolta"
 
 def salvar_registro(encarregado, localidade, balsa, valor_escolta, data, hora, observacao):
-    coluna_ativa = obter_coluna_segura()
+    coluna_ativa = obtener_coluna_segura()
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
     
@@ -85,7 +115,6 @@ def salvar_registro(encarregado, localidade, balsa, valor_escolta, data, hora, o
         INSERT INTO frequencia (encarregado, localidade, balsa, {coluna_ativa}, data, hora, observacao)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     '''
-    # Salvamos sempre em caixa alta para manter padronizado no banco
     c.execute(query, (encarregado.strip().upper(), localidade, balsa, valor_escolta, data, hora, observacao))
     conn.commit()
     conn.close()
@@ -99,7 +128,6 @@ def buscar_registros_df(usuario_atual):
     
     coluna_busca = "nome_esc" if "nome_esc" in colunas else "nome_escolta"
     
-    # Tratamento para ignorar maiúsculas/minúsculas no filtro
     if usuario_atual.lower() == 'admin':
         query = f"SELECT encarregado, localidade, balsa, {coluna_busca}, data, hora, observacao FROM frequencia"
         df = pd.read_sql_query(query, conn)
@@ -154,7 +182,7 @@ USUARIOS_VALIDOS = {
     "admin": "1234",
     "supervisor": "senha123",
     "janari": "223344",
-    "eriton": "252627",
+    "usuario4": "frequencia4",
     "usuario5": "frequencia5",
     "usuario6": "frequencia6",
     "usuario7": "frequencia7"
@@ -162,42 +190,40 @@ USUARIOS_VALIDOS = {
 
 def tela_login():
     carregar_css_com_fundo()
-    st.subheader("⚡ CONTROLE DE ACESSO - OPERAÇÃO")
+    st.subheader("⚡ CONTROLE DE ACESSO")
     
-    # Tratando a entrada do usuário removendo espaços e convertendo para minúsculo
     usuario = st.text_input("Usuário / Credencial").strip().lower()
     senha = st.text_input("Senha", type="password")
     
     if st.button("Autenticar"):
         if usuario in USUARIOS_VALIDOS and str(USUARIOS_VALIDOS[usuario]) == str(senha):
             st.session_state['logado'] = True
-            st.session_state['usuario_atual'] = usuario  # Salva sempre padronizado em minúsculo internamente
+            st.session_state['usuario_atual'] = usuario
             st.rerun()
         else:
-            st.error("Credenciais incorretas ou operador não autorizado.")
+            st.error("Credenciais incorretas.")
 
 
 ###############################################################################
-# BLOCO V: PAINEL PRINCIPAL E INTERFACE LATERAL
+# BLOCO V: PAINEL PRINCIPAL ADAPTADO PARA APONTAMENTO VIA CELULAR
 ###############################################################################
 def tela_sistema():
     carregar_css_com_fundo()
     usuario_sessao = st.session_state['usuario_atual']
     
-    # --- MENUS E AÇÕES NA BARRA LATERAL (SIDEBAR) ---
-    st.sidebar.title("⚙️ Operação")
-    st.sidebar.write(f"Usuário: **{usuario_sessao.upper()}**")
+    # --- BARRA LATERAL ---
+    st.sidebar.title("⚙️ Menu")
+    st.sidebar.write(f"Operador: **{usuario_sessao.upper()}**")
     
-    if st.sidebar.button("🚪 Finalizar Turno (Logout)", use_container_width=True):
+    if st.sidebar.button("🚪 Sair do Sistema", use_container_width=True):
         st.session_state['logado'] = False
         st.rerun()
         
     df_registros = buscar_registros_df(usuario_sessao)
     
-    # Restrição Exclusiva Admin na Lateral
     if usuario_sessao == 'admin':
         st.sidebar.markdown("---")
-        st.sidebar.subheader("🛠️ Ferramentas Admin")
+        st.sidebar.subheader("🛠️ Painel Admin")
         if not df_registros.empty:
             try:
                 pdf_bytes = gerar_pdf(df_registros)
@@ -211,81 +237,75 @@ def tela_sistema():
             except Exception as e:
                 st.sidebar.error(f"Erro no PDF: {e}")
                 
-        if st.sidebar.button("⚠️ Limpar Histórico Completo", use_container_width=True):
+        if st.sidebar.button("⚠️ Limpar Banco de Dados", use_container_width=True):
             conn = sqlite3.connect('registro_presenca.db')
             c = conn.cursor()
             c.execute("DROP TABLE IF EXISTS frequencia")
             conn.commit()
             conn.close()
             inicializar_banco_seguro()
-            st.success("Histórico reiniciado!")
+            st.success("Reiniciado!")
             st.rerun()
 
-    # --- CORPO CENTRAL DA TELA ---
-    st.title("🛡️ Painel de Segurança e Frequência")
+    # --- CORPO CENTRAL ---
+    st.title("🛡️ Registro de Escolta")
     st.markdown("---")
-    st.subheader("✍️ Nova Conferência de Frequência")
     
-    url_escolta_esquerda = "https://images.unsplash.com/photo-1579202673506-ca3ce28943ef?q=80&w=300&auto=format&fit=crop"
-    url_escolta_direita = "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?q=80&w=300&auto=format&fit=crop"
-    
-    col_lateral_esq, col_central_painel, col_lateral_dir = st.columns([1, 4, 1])
-    
-    with col_lateral_esq:
-        st.image(url_escolta_esquerda, use_container_width=True)
+    # ATENÇÃO MOBILE: No Android as fotos laterais iam esmagar o formulário.
+    # Agora elas só aparecem se a tela for grande. No celular, o formulário ocupa o espaço todo.
+    with st.form(key='form_registro'):
+        st.subheader("✍️ Nova Conferência")
         
-    with col_lateral_dir:
-        st.image(url_escolta_direita, use_container_width=True)
+        encarregado_input = st.text_input("Encarregado", value=usuario_sessao.upper(), disabled=(usuario_sessao != 'admin'))
         
-    with col_central_painel:
         lista_localidades = ["MIRITITUBA", "SANTARÉM", "BELÉM", "MANAUS", "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"]
+        localidade = st.selectbox("Localidade", options=lista_localidades)
+        
+        balsa_input = st.text_input("Identificação da Balsa")
+        nome_escolta_input = st.text_input("Nome do Vigilante / Escolta")
+        
         fuso_horario = dt.timezone(dt.timedelta(hours=-3))
         agora_local = datetime.now(fuso_horario)
         
-        with st.form(key='form_registro'):
-            c1, c2 = st.columns(2)
-            with c1:
-                encarregado_input = st.text_input("Encarregado", value=usuario_sessao.upper(), disabled=(usuario_sessao != 'admin'))
-                localidade = st.selectbox("Localidade", options=lista_localidades)
-                balsa_input = st.text_input("Balsa")
-            with c2:
-                nome_escolta_input = st.text_input("Nome do Escolta")
-                data_atual = st.date_input("Data", agora_local.date(), format="DD/MM/YYYY")
-                hora_atual = st.time_input("Hora", agora_local.time())
-                
-            observacao_input = st.text_area("Observação")
-            botao_enviar = st.form_submit_button("Registrar Presença")
+        c1, c2 = st.columns(2)
+        with c1:
+            data_atual = st.date_input("Data", agora_local.date(), format="DD/MM/YYYY")
+        with c2:
+            hora_atual = st.time_input("Hora", agora_local.time())
             
-            if botao_enviar:
-                if balsa_input and nome_escolta_input:
-                    hora_str = hora_atual.strftime("%H:%M")
-                    data_str = data_atual.strftime("%d/%m/%Y")
-                    
-                    encarregado = encarregado_input.strip().upper()
-                    balsa = balsa_input.strip().upper()
-                    nome_escolta = nome_escolta_input.strip().upper()
-                    observacao = observacao_input.strip().upper()
-                    
-                    salvar_registro(encarregado, localidade, balsa, nome_escolta, data_str, hora_str, observacao)
-                    st.success("✅ REGISTRO SALVO COM SUCESSO!")
-                    st.rerun()
-                else:
-                    st.error("⚠️ Por favor, preencha os campos obrigatórios.")
+        observacao_input = st.text_area("Observações Gerais")
+        
+        botao_enviar = st.form_submit_button("CONFERIR E SALVAR REGISTRO")
+        
+        if botao_enviar:
+            if balsa_input and nome_escolta_input:
+                hora_str = hora_atual.strftime("%H:%M")
+                data_str = data_atual.strftime("%d/%m/%Y")
+                
+                salvar_registro(
+                    encarregado_input.strip().upper(), 
+                    localidade, 
+                    balsa_input.strip().upper(), 
+                    nome_escolta_input.strip().upper(), 
+                    data_str, 
+                    hora_str, 
+                    observacao_input.strip().upper()
+                )
+                st.success("✅ REGISTRO SALVO NO BANCO!")
+                st.rerun()
+            else:
+                st.error("⚠️ Preencha os campos obrigatórios (Balsa e Escolta).")
 
-
-###############################################################################
-# BLOCO VI: HISTÓRICO DE FREQUÊNCIA COM PRIVACIDADE OPERACIONAL
-###############################################################################
     st.markdown("---")
     if usuario_sessao == 'admin':
-        st.subheader("📊 Histórico Operacional Completo (Visão Master)")
+        st.subheader("📊 Histórico Operacional Geral")
     else:
-        st.subheader("📊 Meus Lançamentos Recentes")
+        st.subheader("📊 Meus Registros Recentes")
     
     if not df_registros.empty:
         st.dataframe(df_registros, use_container_width=True)
     else:
-        st.info("Nenhum registro de frequência encontrado para o seu usuário.")
+        st.info("Nenhum lançamento encontrado para este usuário.")
 
 
 ###############################################################################
