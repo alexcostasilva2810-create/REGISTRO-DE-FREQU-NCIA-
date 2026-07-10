@@ -10,7 +10,6 @@ from io import BytesIO
 # BLOCO I: CONFIGURAÇÃO VISUAL E ESTILIZAÇÃO (CSS)
 ###############################################################################
 def carregar_css_com_fundo():
-    # Imagem sutil de fundo operacional
     url_fundo = "https://images.unsplash.com/photo-1557597774-9d273605dfa9?q=80&w=1200&auto=format&fit=crop"
     
     css_string = f"""
@@ -22,8 +21,6 @@ def carregar_css_com_fundo():
         background-attachment: fixed;
         background-position: center;
     }}
-
-    /* Blocos de conteúdo com contraste para leitura */
     h1, h2, h3, p, .stMarkdown, div[data-baseweb="select"], .stAlert {{
         background-color: rgba(255, 255, 255, 0.95);
         padding: 10px 15px;
@@ -31,14 +28,10 @@ def carregar_css_com_fundo():
         color: #0F172A !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.15);
     }}
-    
-    /* Campos de entrada visíveis */
     .stTextInput>div>div>input, .stForm {{
         background-color: white !important;
         border: 1px solid #1E293B !important;
     }}
-    
-    /* Histórico / Tabela de dados */
     [data-testid="stDataFrame"] {{
         background-color: rgba(255, 255, 255, 0.96) !important;
         border-radius: 6px;
@@ -51,9 +44,10 @@ def carregar_css_com_fundo():
 
 
 ###############################################################################
-# BLOCO II: BANCO DE DADOS (SQLITE3)
+# BLOCO II: CONEXÃO E GERENCIAMENTO DO BANCO DE DADOS (SQLITE3)
 ###############################################################################
-def obtener_coluna_segura():
+def inicializar_banco_seguro():
+    """Garante que a tabela sempre exista para evitar erros de 'no such table'"""
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
     c.execute('''
@@ -68,6 +62,13 @@ def obtener_coluna_segura():
             observacao TEXT
         )
     ''')
+    conn.commit()
+    conn.close()
+
+def obter_coluna_segura():
+    inicializar_banco_seguro()
+    conn = sqlite3.connect('registro_presenca.db')
+    c = conn.cursor()
     c.execute("PRAGMA table_info(frequencia)")
     colunas = [col[1] for col in c.fetchall()]
     conn.close()
@@ -77,7 +78,7 @@ def obtener_coluna_segura():
     return "nome_escolta"
 
 def salvar_registro(encarregado, localidade, balsa, valor_escolta, data, hora, observacao):
-    coluna_ativa = obtener_coluna_segura()
+    coluna_ativa = obter_coluna_segura()
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
     
@@ -90,6 +91,7 @@ def salvar_registro(encarregado, localidade, balsa, valor_escolta, data, hora, o
     conn.close()
 
 def buscar_registros_df():
+    inicializar_banco_seguro()
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
     c.execute("PRAGMA table_info(frequencia)")
@@ -106,7 +108,7 @@ def buscar_registros_df():
 
 
 ###############################################################################
-# BLOCO III: RELATÓRIOS EM PDF
+# BLOCO III: EXPORTAÇÃO DE RELATÓRIOS (GERAÇÃO DE PDF)
 ###############################################################################
 def gerar_pdf(df):
     pdf = FPDF(orientation="L", unit="mm", format="A4")
@@ -137,15 +139,17 @@ def gerar_pdf(df):
 
 
 ###############################################################################
-# BLOCO IV: CONTROLE DE SESSÃO E LOGIN
+# BLOCO IV: CADASTRO E CONTROLE DE ACESSO (7 USUÁRIOS CORRIGIDOS)
 ###############################################################################
 if 'logado' not in st.session_state:
     st.session_state['logado'] = False
 
+# CORREÇÃO CRÍTICA: Todas as chaves agora estão estritamente em letras minúsculas 
+# para bater perfeitamente com a validação do login sem travar.
 USUARIOS_VALIDOS = {
     "admin": "1234",
-    "Janari": "87654",
-    "Janari": "223344",
+    "supervisor": "senha123",
+    "janari": "223344",
     "usuario4": "frequencia4",
     "usuario5": "frequencia5",
     "usuario6": "frequencia6",
@@ -159,16 +163,16 @@ def tela_login():
     senha = st.text_input("Senha", type="password")
     
     if st.button("Autenticar"):
-        if usuario in USUARIOS_VALIDOS and USUARIOS_VALIDOS[usuario] == senha:
+        if usuario in USUARIOS_VALIDOS and str(USUARIOS_VALIDOS[usuario]) == str(senha):
             st.session_state['logado'] = True
             st.session_state['usuario_atual'] = usuario
             st.rerun()
         else:
-            st.error("Credenciais incorretas.")
+            st.error("Credenciais incorretas ou operador não autorizado.")
 
 
 ###############################################################################
-# BLOCO V: INTERFACE PRINCIPAL DO SISTEMA
+# BLOCO V: FORMULÁRIO DE CADASTRO DE FREQUÊNCIA
 ###############################################################################
 def tela_sistema():
     carregar_css_com_fundo()
@@ -188,10 +192,10 @@ def tela_sistema():
     col_lateral_esq, col_central_painel, col_lateral_dir = st.columns([1, 4, 1])
     
     with col_lateral_esq:
-        st.image(url_escolta_esquerda, use_container_width=True, caption="Segurança VIP")
+        st.image(url_escolta_esquerda, use_container_width=True)
         
     with col_lateral_dir:
-        st.image(url_escolta_direita, use_container_width=True, caption="Pronto Emprego")
+        st.image(url_escolta_direita, use_container_width=True)
         
     with col_central_painel:
         lista_localidades = ["MIRITITUBA", "SANTARÉM", "BELÉM", "MANAUS", "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"]
@@ -201,7 +205,7 @@ def tela_sistema():
         with st.form(key='form_registro'):
             c1, c2 = st.columns(2)
             with c1:
-                encarregado_input = st.text_input("Encarregado", value=st.session_state['usuario_atual'])
+                encarregado_input = st.text_input("Encarregado", value=st.session_state['usuario_atual'].upper())
                 localidade = st.selectbox("Localidade", options=lista_localidades)
                 balsa_input = st.text_input("Balsa")
             with c2:
@@ -226,10 +230,11 @@ def tela_sistema():
                     st.success("✅ REGISTRO SALVO COM SUCESSO!")
                     st.rerun()
                 else:
-                    st.error("⚠️ Por favor, preencha os campos obrigatórios.")
+                    st.error("⚠️ Por favor, preencha os campos obrigatórios (Balsa e Nome do Escolta).")
+
 
 ###############################################################################
-# BLOCO VI: HISTÓRICO DE DADOS RECENTES (NA TELA)
+# BLOCO VI: HISTÓRICO DE FREQUÊNCIA (CORRIGIDO CONTRA QUEDAS)
 ###############################################################################
     st.markdown("---")
     st.subheader("📊 Histórico de Frequência Recente")
@@ -241,13 +246,14 @@ def tela_sistema():
             c.execute("DROP TABLE IF EXISTS frequencia")
             conn.commit()
             conn.close()
-            st.success("Histórico reiniciado com sucesso!")
+            # CORREÇÃO CRÍTICA: Força a recriação imediata da tabela para evitar o erro de sumir tudo na tela
+            inicializar_banco_seguro()
+            st.success("Banco de dados limpo e reiniciado com segurança!")
             st.rerun()
             
     try:
         df_registros = buscar_registros_df()
         if not df_registros.empty:
-            # Exibe a tabela interativa do histórico recente para os operadores
             st.dataframe(df_registros, use_container_width=True)
             
             if st.session_state['usuario_atual'] == 'admin':
@@ -263,14 +269,17 @@ def tela_sistema():
                 except Exception as e:
                     st.error(f"Erro ao processar PDF: {e}")
         else:
-            st.info("Nenhum registro de escolta encontrado.")
+            st.info("Nenhum registro de frequência encontrado até o momento.")
     except Exception as e:
-        st.error(f"Erro ao carregar os dados salvos: {e}")
+        st.error(f"Erro crítico ao carregar os dados salvos: {e}")
 
 
 ###############################################################################
-# BLOCO VII: FLUXO PRINCIPAL
+# BLOCO VII: FLUXO DE EXECUÇÃO PRINCIPAL
 ###############################################################################
+# Garante a existência da estrutura antes de carregar a tela
+inicializar_banco_seguro()
+
 if not st.session_state['logado']:
     tela_login()
 else:
