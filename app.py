@@ -10,7 +10,7 @@ from io import BytesIO
 # BLOCO I: CONFIGURAÇÃO VISUAL E ESTILIZAÇÃO (CSS)
 ###############################################################################
 def carregar_css_com_fundo():
-    # Imagem de fundo sutil de monitoramento operacional
+    # Imagem sutil de fundo operacional
     url_fundo = "https://images.unsplash.com/photo-1557597774-9d273605dfa9?q=80&w=1200&auto=format&fit=crop"
     
     css_string = f"""
@@ -23,7 +23,7 @@ def carregar_css_com_fundo():
         background-position: center;
     }}
 
-    /* Blocos de texto e alertas com excelente contraste */
+    /* Blocos de conteúdo com contraste para leitura */
     h1, h2, h3, p, .stMarkdown, div[data-baseweb="select"], .stAlert {{
         background-color: rgba(255, 255, 255, 0.95);
         padding: 10px 15px;
@@ -32,13 +32,13 @@ def carregar_css_com_fundo():
         box-shadow: 0 4px 6px rgba(0,0,0,0.15);
     }}
     
-    /* Inputs visíveis e destacados */
+    /* Campos de entrada visíveis */
     .stTextInput>div>div>input, .stForm {{
         background-color: white !important;
         border: 1px solid #1E293B !important;
     }}
     
-    /* Estilização da tabela de dados */
+    /* Histórico / Tabela de dados */
     [data-testid="stDataFrame"] {{
         background-color: rgba(255, 255, 255, 0.96) !important;
         border-radius: 6px;
@@ -51,10 +51,9 @@ def carregar_css_com_fundo():
 
 
 ###############################################################################
-# BLOCO II: CONEXÃO E GERENCIAMENTO DO BANCO DE DADOS (SQLITE3)
+# BLOCO II: BANCO DE DADOS (SQLITE3)
 ###############################################################################
 def obtener_coluna_segura():
-    """Identifica se o banco usa 'nome_esc' ou 'nome_escolta' para evitar erros de gravação"""
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
     c.execute('''
@@ -107,7 +106,7 @@ def buscar_registros_df():
 
 
 ###############################################################################
-# BLOCO III: EXPORTAÇÃO DE RELATÓRIOS (GERAÇÃO DE PDF)
+# BLOCO III: RELATÓRIOS EM PDF
 ###############################################################################
 def gerar_pdf(df):
     pdf = FPDF(orientation="L", unit="mm", format="A4")
@@ -138,14 +137,14 @@ def gerar_pdf(df):
 
 
 ###############################################################################
-# BLOCO IV: CONTROLE DE SESSÃO E TELA DE LOGIN (7 USUÁRIOS CONFIGURADOS)
+# BLOCO IV: CONTROLE DE SESSÃO E LOGIN
 ###############################################################################
 if 'logado' not in st.session_state:
     st.session_state['logado'] = False
 
 USUARIOS_VALIDOS = {
     "admin": "1234",
-    "JANARI": "87654",
+    "supervisor": "senha123",
     "usuario3": "frequencia3",
     "usuario4": "frequencia4",
     "usuario5": "frequencia5",
@@ -165,11 +164,11 @@ def tela_login():
             st.session_state['usuario_atual'] = usuario
             st.rerun()
         else:
-            st.error("Credenciais incorretas ou operador não autorizado.")
+            st.error("Credenciais incorretas.")
 
 
 ###############################################################################
-# BLOCO V: TELA DO SISTEMA E FORMULÁRIO DE CADASTRO (COM LATERAIS VISUAIS)
+# BLOCO V: INTERFACE PRINCIPAL DO SISTEMA
 ###############################################################################
 def tela_sistema():
     carregar_css_com_fundo()
@@ -183,19 +182,16 @@ def tela_sistema():
     st.markdown("---")
     st.subheader("✍️ Nova Conferência de Frequência")
     
-    # Imagens verticais de escoltas táticos para as laterais do painel
     url_escolta_esquerda = "https://images.unsplash.com/photo-1579202673506-ca3ce28943ef?q=80&w=300&auto=format&fit=crop"
     url_escolta_direita = "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?q=80&w=300&auto=format&fit=crop"
     
-    # Layout em colunas: [Escolta Esquerda] [Painel Central] [Escolta Direita]
     col_lateral_esq, col_central_painel, col_lateral_dir = st.columns([1, 4, 1])
     
-    # EXCLUSÃO EFETUADA: Removido o parâmetro 'caption' das imagens laterais
     with col_lateral_esq:
-        st.image(url_escolta_esquerda, use_container_width=True)
+        st.image(url_escolta_esquerda, use_container_width=True, caption="Segurança VIP")
         
     with col_lateral_dir:
-        st.image(url_escolta_direita, use_container_width=True)
+        st.image(url_escolta_direita, use_container_width=True, caption="Pronto Emprego")
         
     with col_central_painel:
         lista_localidades = ["MIRITITUBA", "SANTARÉM", "BELÉM", "MANAUS", "TROMBETAS", "JURUTIR", "PORTO VELHO", "NOVO REMANSO"]
@@ -230,14 +226,13 @@ def tela_sistema():
                     st.success("✅ REGISTRO SALVO COM SUCESSO!")
                     st.rerun()
                 else:
-                    st.error("⚠️ Por favor, preencha os campos obrigatórios (Balsa e Nome do Escolta).")
-
+                    st.error("⚠️ Por favor, preencha os campos obrigatórios.")
 
 ###############################################################################
-# BLOCO VI: HISTÓRICO DE FREQUÊNCIA E PAINEL ADM
+# BLOCO VI: HISTÓRICO DE DADOS RECENTES (NA TELA)
 ###############################################################################
     st.markdown("---")
-    st.subheader("📊 Histórico de Frequência")
+    st.subheader("📊 Histórico de Frequência Recente")
     
     if st.session_state['usuario_atual'] == 'admin':
         if st.button("⚠️ Redefinir Banco de Dados (Limpar Histórico Completo)"):
@@ -246,12 +241,13 @@ def tela_sistema():
             c.execute("DROP TABLE IF EXISTS frequencia")
             conn.commit()
             conn.close()
-            st.success("Banco de dados reiniciado e 100% atualizado!")
+            st.success("Histórico reiniciado com sucesso!")
             st.rerun()
             
     try:
         df_registros = buscar_registros_df()
         if not df_registros.empty:
+            # Exibe a tabela interativa do histórico recente para os operadores
             st.dataframe(df_registros, use_container_width=True)
             
             if st.session_state['usuario_atual'] == 'admin':
@@ -267,13 +263,13 @@ def tela_sistema():
                 except Exception as e:
                     st.error(f"Erro ao processar PDF: {e}")
         else:
-            st.info("Nenhum registro de escolta ativo encontrado no momento.")
+            st.info("Nenhum registro de escolta encontrado.")
     except Exception as e:
         st.error(f"Erro ao carregar os dados salvos: {e}")
 
 
 ###############################################################################
-# BLOCO VII: FLUXO DE EXECUÇÃO PRINCIPAL
+# BLOCO VII: FLUXO PRINCIPAL
 ###############################################################################
 if not st.session_state['logado']:
     tela_login()
