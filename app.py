@@ -47,7 +47,6 @@ def carregar_css_com_fundo():
 # BLOCO II: CONEXÃO E GERENCIAMENTO DO BANCO DE DADOS (SQLITE3)
 ###############################################################################
 def inicializar_banco_seguro():
-    """Garante que a tabela sempre exista para evitar erros de 'no such table'"""
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
     c.execute('''
@@ -90,7 +89,7 @@ def salvar_registro(encarregado, localidade, balsa, valor_escolta, data, hora, o
     conn.commit()
     conn.close()
 
-def buscar_registros_df():
+def buscar_registros_df(usuario_atual):
     inicializar_banco_seguro()
     conn = sqlite3.connect('registro_presenca.db')
     c = conn.cursor()
@@ -98,9 +97,15 @@ def buscar_registros_df():
     colunas = [col[1] for col in c.fetchall()]
     
     coluna_busca = "nome_esc" if "nome_esc" in colunas else "nome_escolta"
-    query = f"SELECT encarregado, localidade, balsa, {coluna_busca}, data, hora, observacao FROM frequencia"
     
-    df = pd.read_sql_query(query, conn)
+    # REGRA DE VISIBILIDADE CRÍTICA: Admin vê tudo, usuário comum vê apenas o dele
+    if usuario_atual == 'admin':
+        query = f"SELECT encarregado, localidade, balsa, {coluna_busca}, data, hora, observacao FROM frequencia"
+        df = pd.read_sql_query(query, conn)
+    else:
+        query = f"SELECT encarregado, localidade, balsa, {coluna_busca}, data, hora, observacao FROM frequencia WHERE UPPER(encarregado) = ?"
+        df = pd.read_sql_query(query, conn, params=(usuario_atual.upper(),))
+        
     conn.close()
     
     df.columns = ["Encarregado", "Localidade", "Balsa", "Nome do Escolta", "Data", "Hora", "Observação"]
@@ -139,13 +144,11 @@ def gerar_pdf(df):
 
 
 ###############################################################################
-# BLOCO IV: CADASTRO E CONTROLE DE ACESSO (7 USUÁRIOS CORRIGIDOS)
+# BLOCO IV: CADASTRO E CONTROLE DE ACESSO
 ###############################################################################
 if 'logado' not in st.session_state:
     st.session_state['logado'] = False
 
-# CORREÇÃO CRÍTICA: Todas as chaves agora estão estritamente em letras minúsculas 
-# para bater perfeitamente com a validação do login sem travar.
 USUARIOS_VALIDOS = {
     "admin": "1234",
     "supervisor": "senha123",
@@ -172,17 +175,52 @@ def tela_login():
 
 
 ###############################################################################
-# BLOCO V: FORMULÁRIO DE CADASTRO DE FREQUÊNCIA
+# BLOCO V: PAINEL PRINCIPAL E INTERFACE LATERAL
 ###############################################################################
 def tela_sistema():
     carregar_css_com_fundo()
-    st.title("🛡️ Painel de Segurança e Frequência")
-    st.write(f"Operador Ativo: **{st.session_state['usuario_atual'].upper()}**")
+    usuario_sessao = st.session_state['usuario_atual']
     
-    if st.button("Finalizar Turno (Logout)"):
+    # --- MENUS E AÇÕES NA BARRA LATERAL (SIDEBAR) ---
+    st.sidebar.title("⚙️ Operação")
+    st.sidebar.write(f"Usuário: **{usuario_sessao.upper()}**")
+    
+    if st.sidebar.button("🚪 Finalizar Turno (Logout)", use_container_width=True):
         st.session_state['logado'] = False
         st.rerun()
         
+    # Busca os registros baseando-se no nível de privilégio do usuário logado
+    df_registros = buscar_registros_df(usuario_sessao)
+    
+    # Restrição Exclusiva Admin na Lateral
+    if usuario_sessao == 'admin':
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("🛠️ Ferramentas Admin")
+        if not df_registros.empty:
+            try:
+                pdf_bytes = gerar_pdf(df_registros)
+                st.sidebar.download_button(
+                    label="📥 Exportar para PDF",
+                    data=pdf_bytes,
+                    file_name=f"historico_frequencia_{datetime.now().strftime('%d_%m_%Y')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.sidebar.error(f"Erro no PDF: {e}")
+                
+        if st.sidebar.button("⚠️ Limpar Histórico Completo", use_container_width=True):
+            conn = sqlite3.connect('registro_presenca.db')
+            c = conn.cursor()
+            c.execute("DROP TABLE IF EXISTS frequencia")
+            conn.commit()
+            conn.close()
+            inicializar_banco_seguro()
+            st.success("Histórico reiniciado!")
+            st.rerun()
+
+    # --- CORPO CENTRAL DA TELA ---
+    st.title("🛡️ Painel de Segurança e Frequência")
     st.markdown("---")
     st.subheader("✍️ Nova Conferência de Frequência")
     
@@ -205,7 +243,7 @@ def tela_sistema():
         with st.form(key='form_registro'):
             c1, c2 = st.columns(2)
             with c1:
-                encarregado_input = st.text_input("Encarregado", value=st.session_state['usuario_atual'].upper())
+                encarregado_input = st.text_input("Encarregado", value=usuario_sessao.upper(), disabled=(usuario_sessao != 'admin'))
                 localidade = st.selectbox("Localidade", options=lista_localidades)
                 balsa_input = st.text_input("Balsa")
             with c2:
@@ -230,54 +268,27 @@ def tela_sistema():
                     st.success("✅ REGISTRO SALVO COM SUCESSO!")
                     st.rerun()
                 else:
-                    st.error("⚠️ Por favor, preencha os campos obrigatórios (Balsa e Nome do Escolta).")
+                    st.error("⚠️ Por favor, preencha os campos obrigatórios.")
 
 
 ###############################################################################
-# BLOCO VI: HISTÓRICO DE FREQUÊNCIA (CORRIGIDO CONTRA QUEDAS)
+# BLOCO VI: HISTÓRICO DE FREQUÊNCIA COM PRIVACIDADE OPERACIONAL
 ###############################################################################
     st.markdown("---")
-    st.subheader("📊 Histórico de Frequência Recente")
+    if usuario_sessao == 'admin':
+        st.subheader("📊 Histórico Operacional Completo (Visão Master)")
+    else:
+        st.subheader("📊 Meus Lançamentos Recentes")
     
-    if st.session_state['usuario_atual'] == 'admin':
-        if st.button("⚠️ Redefinir Banco de Dados (Limpar Histórico Completo)"):
-            conn = sqlite3.connect('registro_presenca.db')
-            c = conn.cursor()
-            c.execute("DROP TABLE IF EXISTS frequencia")
-            conn.commit()
-            conn.close()
-            # CORREÇÃO CRÍTICA: Força a recriação imediata da tabela para evitar o erro de sumir tudo na tela
-            inicializar_banco_seguro()
-            st.success("Banco de dados limpo e reiniciado com segurança!")
-            st.rerun()
-            
-    try:
-        df_registros = buscar_registros_df()
-        if not df_registros.empty:
-            st.dataframe(df_registros, use_container_width=True)
-            
-            if st.session_state['usuario_atual'] == 'admin':
-                st.markdown("### 🛠️ Painel do Administrador")
-                try:
-                    pdf_bytes = gerar_pdf(df_registros)
-                    st.download_button(
-                        label="📥 Exportar Histórico para PDF",
-                        data=pdf_bytes,
-                        file_name=f"historico_frequencia_{datetime.now().strftime('%d_%m_%Y')}.pdf",
-                        mime="application/pdf"
-                    )
-                except Exception as e:
-                    st.error(f"Erro ao processar PDF: {e}")
-        else:
-            st.info("Nenhum registro de frequência encontrado até o momento.")
-    except Exception as e:
-        st.error(f"Erro crítico ao carregar os dados salvos: {e}")
+    if not df_registros.empty:
+        st.dataframe(df_registros, use_container_width=True)
+    else:
+        st.info("Nenhum registro de frequência encontrado para o seu usuário.")
 
 
 ###############################################################################
-# BLOCO VII: FLUXO DE EXECUÇÃO PRINCIPAL
+# BLOCO VII: FLUXO PRINCIPAL
 ###############################################################################
-# Garante a existência da estrutura antes de carregar a tela
 inicializar_banco_seguro()
 
 if not st.session_state['logado']:
